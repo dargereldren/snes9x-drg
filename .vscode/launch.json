@@ -5,7 +5,7 @@
 			"name": "Run Snes9x",
 			"type": "cppdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/snes9x-sdl2",
+			"program": "${workspaceFolder}/snes9x-lin",
 			"args": ["test.sfc"],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",

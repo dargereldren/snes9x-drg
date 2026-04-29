@@ -1,0 +1,25 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Run Snes9x",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/snes9x-sdl2",
+			"args": ["test.sfc"],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"preLaunchTask": "make build",
+			"MIMode": "gdb",
+			"environment": [
+				{ "name": "__GL_THREADED_OPTIMIZATION", "value": "1" },
+				{ "name": "__GL_NextGenCompiler", "value": "1" },
+				{ "name": "__GL_SHADER_DISK_CACHE", "value": "1" },
+				{ "name": "__GL_SHADER_DISK_CACHE_SKIP_CLEANUP", "value": "1" },
+				{ "name": "__GL_SHADER_DISK_CACHE_PATH", "value": "../Cache" },
+				{ "name": "__NV_PRIME_RENDER_OFFLOAD", "value": "1" },
+				{ "name": "__GLX_VENDOR_LIBRARY_NAME", "value": "nvidia" }
+			]
+		}
+	]
+}

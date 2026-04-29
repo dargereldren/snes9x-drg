@@ -1,0 +1,47 @@
+# prerequisites
+*.d
+
+# object files
+*.o
+*.obj
+
+# libraries
+*.lib
+*.a
+*.la
+*.lai
+
+# shared objects
+*.so
+*.dylib
+*.dll
+
+# precompiled headers
+*.gch
+*.pch
+
+# executables
+*.exe
+*.out
+*.app
+
+# build directories
+build/
+
+# cmake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.txt
+compile_commands.json
+
+# os junk
+.DS_Store
+Thumbs.db
+
+# logs n temp
+*.log
+*.tmp
+snes9x.conf
+snes9x-lin

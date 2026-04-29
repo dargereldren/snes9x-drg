@@ -1,0 +1,23 @@
+---
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AlignAfterOpenBracket: AlwaysBreak
+AllowAllArgumentsOnNextLine: false
+InsertBraces: true
+AllowShortEnumsOnASingleLine: true
+UseTab: Always
+UseCRLF: false
+TabWidth: 4
+IndentWidth: 4
+Language: Cpp
+BinPackParameters: false
+ColumnLimit: 0
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackArguments: false
+AlignArrayOfStructures: Left
+BreakArrays: false
+AllowShortLambdasOnASingleLine: All
+SortIncludes: false

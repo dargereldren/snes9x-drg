@@ -2876,19 +2876,18 @@ void CMemory::Map_SufamiTurboPseudoLoROMMap (void)
 
 void CMemory::Map_SuperFXLoROMMap (void)
 {
-	printf("Map_SuperFXLoROMMap %d %d\n", ROM[0x7FD7], SRAMSize);
+	printf("Map_SuperFXLoROMMap\n");
 	map_System();
 
 	// Replicate the first 2Mb of the ROM at ROM + FX_MEMORY_32K_MIRRORS such that each 32K
 	// block is repeated twice in each 64K block.
-	// [dargereldren] Use FX_MEMORY_32K_MIRRORS instead.
 	for (int c = 0; c < 64; c++)
 	{
 		memmove(&ROM[FX_MEMORY_32K_MIRRORS + 0x0000 + c * 0x10000], &ROM[c * 0x8000], 0x8000);
 		memmove(&ROM[FX_MEMORY_32K_MIRRORS + 0x8000 + c * 0x10000], &ROM[c * 0x8000], 0x8000);
 	}
 
-	// [dargereldren] 11 MB rom. The GSU still cannot access more than 2 MB, but this gives over 11 MB of space for the SNES to work with.
+	// Support for ROMs up to 11MB by setting the ROM size to $0E, The GSU still cannot access more than 2 MB.
 	if (ROM[0x7FD7] >= 0x0E) {
 		map_lorom(0x00, 0x3f, 0x8000, 0xffff, 0x200000);
 		map_lorom_offset(0x80, 0xbf, 0x8000, 0xffff, 0x200000, 0x200000);
@@ -2927,8 +2926,7 @@ void CMemory::Map_SuperFXLoROMMap (void)
 		map_space(0xf1, 0xf1, 0x0000, 0xffff, SRAM + 0x10000);
 	}
 
-	// [dargereldren] support 256KB and 512KB, 896KB ram expansions
-	// again this is not a officially supported configuration by the SuperFX
+	// Respect SRAMSize
 	map_space(0x70, 0x70, 0x0000, 0xffff, SRAM);
 	map_space(0x71, 0x71, 0x0000, 0xffff, SRAM + 0x10000);
 	if(SRAMSize > 7) {

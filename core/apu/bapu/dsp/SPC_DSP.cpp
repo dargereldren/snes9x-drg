@@ -1021,11 +1021,8 @@ ECHO_CLOCK( 25 )
 	int l = m.t_echo_in [0] + CALC_FIR( 6, 0 );
 	int r = m.t_echo_in [1] + CALC_FIR( 6, 1 );
 
-	l = (int16_t) l;
-	r = (int16_t) r;
-
-	l += (int16_t) CALC_FIR( 7, 0 );
-	r += (int16_t) CALC_FIR( 7, 1 );
+	l += CALC_FIR( 7, 0 );
+	r += CALC_FIR( 7, 1 );
 
 	CLAMP16( l );
 	CLAMP16( r );
@@ -1035,8 +1032,7 @@ ECHO_CLOCK( 25 )
 }
 inline int SPC_DSP::echo_output( int ch )
 {
-	int out = (int16_t) ((m.t_main_out [ch] * (int8_t) REG(mvoll + ch * 0x10)) >> 7) +
-			(int16_t) ((m.t_echo_in [ch] * (int8_t) REG(evoll + ch * 0x10)) >> 7);
+	int out = ((m.t_main_out [ch] * (int8_t) REG(mvoll + ch * 0x10)) >> 7) + ((m.t_echo_in [ch] * (int8_t) REG(evoll + ch * 0x10)) >> 7);
 	CLAMP16( out );
 	return out;
 }
@@ -1047,8 +1043,8 @@ ECHO_CLOCK( 26 )
 	m.t_main_out [0] = echo_output( 0 );
 
 	// Echo feedback
-	int l = m.t_echo_out [0] + (int16_t) ((m.t_echo_in [0] * (int8_t) REG(efb)) >> 7);
-	int r = m.t_echo_out [1] + (int16_t) ((m.t_echo_in [1] * (int8_t) REG(efb)) >> 7);
+	int l = m.t_echo_out [0] + ((m.t_echo_in [0] * (int8_t) REG(efb)) >> 7);
+	int r = m.t_echo_out [1] + ((m.t_echo_in [1] * (int8_t) REG(efb)) >> 7);
 
 	CLAMP16( l );
 	CLAMP16( r );

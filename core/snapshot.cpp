@@ -1728,6 +1728,7 @@ int S9xUnfreezeFromStream (STREAM stream)
 		S9xSetCPU(hdma_byte, 0x420c);*/
 
 		S9xControlPostLoadState(&ctl_snap);
+		S9xControlResyncInput();
 
 		if (local_superfx)
 		{

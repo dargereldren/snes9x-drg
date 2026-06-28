@@ -127,8 +127,21 @@ const int b_breaks[] =
 
 static int joystick_lock = 0;
 
+static void track_binding(uint32 id, bool pressed) {
+	if (pressed) {
+		gui_config->held_bindings.insert(id);
+	} else {
+		gui_config->held_bindings.erase(id);
+	}
+}
+
 bool S9xPollButton(uint32 id, bool *pressed) {
-	return true;
+	if (pressed) {
+		*pressed = gui_config->held_bindings.count(id) != 0;
+		return true;
+	}
+
+	return false;
 }
 
 bool S9xPollAxis(uint32 id, int16 *value) {
@@ -358,6 +371,12 @@ s9xcommand_t S9xGetPortCommandT(const char *name) {
 	return cmd;
 }
 
+void S9xReportPhysicalInputState(void) {
+	for (uint32 id : gui_config->held_bindings) {
+		S9xReportButton(id, true);
+	}
+}
+
 void S9xProcessEvents(bool8 block) {
 	if (S9xGrabJoysticks()) {
 		gui_config->joysticks.poll_events();
@@ -365,6 +384,7 @@ void S9xProcessEvents(bool8 block) {
 			JoyEvent event;
 			while (j.second->get_event(&event)) {
 				Binding binding(j.second->joynum, event.parameter, 0);
+				track_binding(binding.hex(), event.state == JOY_PRESSED);
 				S9xReportButton(binding.hex(), event.state == JOY_PRESSED);
 				gui_config->screensaver_needs_reset = true;
 			}

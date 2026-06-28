@@ -460,6 +460,9 @@ void S9xInitInputDevices(void) {
 	}
 }
 
+void S9xReportPhysicalInputState(void) {
+}
+
 void S9xProcessEvents(bool8 block) {
 	SDL_Event event;
 	bool8 quit_state = FALSE;

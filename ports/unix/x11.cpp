@@ -1575,6 +1575,10 @@ void S9xLatchJSEvent ()
 	GUI.js_event_latch = TRUE;
 }
 
+void S9xReportPhysicalInputState (void)
+{
+}
+
 void S9xProcessEvents (bool8 block)
 {
 	// Kick the screensaver if a joystick event occurred

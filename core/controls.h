@@ -287,5 +287,8 @@ struct SControlSnapshot
 
 void S9xControlPreSaveState (struct SControlSnapshot *s);
 void S9xControlPostLoadState (struct SControlSnapshot *s);
+void S9xControlResyncInput (void);
+
+bool8 S9xFreezeGameNoJoypad (const char *filename);
 
 #endif

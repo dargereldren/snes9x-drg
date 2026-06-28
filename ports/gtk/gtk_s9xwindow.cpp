@@ -270,13 +270,19 @@ bool Snes9xWindow::button_press(GdkEventButton *event) {
 		return false;
 	}
 
-	S9xReportButton(BINDING_MOUSE_BUTTON0 + event->button - 1, true);
+	{
+		const uint32 id = BINDING_MOUSE_BUTTON0 + event->button - 1;
+		config->held_bindings.insert(id);
+		S9xReportButton(id, true);
+	}
 
 	return false;
 }
 
 bool Snes9xWindow::button_release(GdkEventButton *event) {
-	S9xReportButton(BINDING_MOUSE_BUTTON0 + event->button - 1, false);
+	const uint32 id = BINDING_MOUSE_BUTTON0 + event->button - 1;
+	config->held_bindings.erase(id);
+	S9xReportButton(id, false);
 
 	return false;
 }
@@ -385,7 +391,13 @@ bool Snes9xWindow::event_key(GdkEventKey *event) {
 	}
 
 	if (cmd.type != S9xNoMapping) {
-		S9xReportButton(b.hex(), (event->type == GDK_KEY_PRESS));
+		const bool pressed = (event->type == GDK_KEY_PRESS);
+		if (pressed) {
+			config->held_bindings.insert(b.hex());
+		} else {
+			config->held_bindings.erase(b.hex());
+		}
+		S9xReportButton(b.hex(), pressed);
 		return true;
 	}
 

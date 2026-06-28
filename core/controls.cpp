@@ -2331,7 +2331,7 @@ void S9xApplyCommand (s9xcommand_t cmd, int16 data1, int16 data2)
 						snprintf(buf, 256, "%s saved", S9xBasename(filename).c_str());
 						S9xSetInfoString(buf);
 
-						S9xFreezeGame(filename.c_str());
+						S9xFreezeGameNoJoypad(filename.c_str());
 						break;
 					}
 
@@ -3611,6 +3611,52 @@ void S9xControlPostLoadState (struct SControlSnapshot *s)
 		pad_read      = s->pad_read;
 		pad_read_last = s->pad_read_last;
 	}
+}
+
+void S9xControlResyncInput (void)
+{
+	for (int i = 0; i < 8; i++)
+	{
+		joypad[i].buttons = 0;
+		joypad[i].turbos  = 0;
+	}
+
+	for (int i = 0; i < 2; i++)
+		mouse[i].buttons &= ~(uint8) 0xc0;
+
+	superscope.phys_buttons = 0;
+	superscope.next_buttons = 0;
+	justifier.buttons = 0;
+	macsrifle.buttons = 0;
+
+	for (auto &entry : keymap)
+		entry.second.button_norpt = 0;
+
+	S9xReportPhysicalInputState();
+}
+
+bool8 S9xFreezeGameNoJoypad (const char *filename)
+{
+	uint16	saved_buttons[8];
+	uint16	saved_turbos[8];
+
+	for (int j = 0; j < 8; j++)
+	{
+		saved_buttons[j] = joypad[j].buttons;
+		saved_turbos[j]  = joypad[j].turbos;
+		joypad[j].buttons = 0;
+		joypad[j].turbos  = 0;
+	}
+
+	bool8	rv = S9xFreezeGame(filename);
+
+	for (int j = 0; j < 8; j++)
+	{
+		joypad[j].buttons = saved_buttons[j];
+		joypad[j].turbos  = saved_turbos[j];
+	}
+
+	return (rv);
 }
 
 uint16 MovieGetJoypad (int i)

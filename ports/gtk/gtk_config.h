@@ -10,6 +10,7 @@
 #include <X11/extensions/Xrandr.h>
 #include <string>
 #include <array>
+#include <unordered_set>
 
 enum {
 	HIRES_MERGE = 0,
@@ -139,6 +140,7 @@ class Snes9xConfig {
 
 	JoyDevices joysticks;
 	int joystick_threshold;
+	std::unordered_set<unsigned int> held_bindings;
 };
 
 std::string get_config_dir();

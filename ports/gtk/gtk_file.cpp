@@ -13,6 +13,7 @@
 #include "display.h"
 #include "memmap.h"
 #include "snapshot.h"
+#include "controls.h"
 #include "cheats.h"
 
 namespace fs = std::filesystem;
@@ -173,7 +174,7 @@ void S9xQuickSaveSlot(int slot) {
 	}
 
 	auto filename = save_slot_path(slot);
-	if (S9xFreezeGame(filename.c_str())) {
+	if (S9xFreezeGameNoJoypad(filename.c_str())) {
 		auto info_string = filename.filename().string() + " saved";
 		S9xSetInfoString(info_string.c_str());
 	}

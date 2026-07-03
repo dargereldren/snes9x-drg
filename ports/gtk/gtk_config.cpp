@@ -305,7 +305,6 @@ int Snes9xConfig::save_config_file() {
 	outint("SoundInterpolationMethod", Settings.InterpolationMethod, "0: None, 1: Linear, 2: Gaussian (what the hardware uses), 3: Cubic, 4: Sinc");
 	outbool("RemoveSpriteLimit", Settings.MaxSpriteTilesPerLine != 34);
 	outbool("OverclockCPU", Settings.OneClockCycle != 6);
-	outbool("EchoBufferHack", Settings.SeparateEchoBuffer, "Prevents echo buffer from overwriting APU RAM");
 
 	section = "Input";
 	controllers controller = CTL_NONE;
@@ -513,7 +512,6 @@ int Snes9xConfig::load_config_file() {
 	inbool("RemoveSpriteLimit", RemoveSpriteLimit);
 	bool OverclockCPU = false;
 	inbool("OverclockCPU", OverclockCPU);
-	inbool("EchoBufferHack", Settings.SeparateEchoBuffer);
 
 	section = "Input";
 
@@ -577,7 +575,6 @@ int Snes9xConfig::load_config_file() {
 	Settings.OneSlowClockCycle = 8;
 	Settings.TwoClockCycles = 12;
 	Settings.MaxSpriteTilesPerLine = 34;
-	Settings.SeparateEchoBuffer = false;
 	Settings.InterpolationMethod = 2;
 	Settings.BlockInvalidVRAMAccessMaster = true;
 #endif

@@ -4727,21 +4727,6 @@
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkCheckButton" id="echo_buffer_hack">
-                                            <property name="label" translatable="yes">Redirect echo buffer overflow</property>
-                                            <property name="visible">False</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="receives_default">False</property>
-                                            <property name="tooltip_text" translatable="yes">Allows old addmusic hacks to work, but will likely hurt other games</property>
-                                            <property name="draw_indicator">True</property>
-                                          </object>
-                                          <packing>
-                                            <property name="expand">False</property>
-                                            <property name="fill">True</property>
-                                            <property name="position">4</property>
-                                          </packing>
-                                        </child>
-                                        <child>
                                           <object class="GtkHBox" id="superfx_multiplier_hbox">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>

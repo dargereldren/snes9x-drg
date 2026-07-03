@@ -434,12 +434,10 @@ void Snes9xPreferences::move_settings_to_dialog() {
 	show_widget("cpu_overclock", true);
 	show_widget("remove_sprite_limit", true);
 	show_widget("allow_invalid_vram_access", true);
-	show_widget("echo_buffer_hack", true);
 	show_widget("soundfilterhbox", true);
 
 	set_check("cpu_overclock", Settings.OneClockCycle != 6);
 	set_check("remove_sprite_limit", Settings.MaxSpriteTilesPerLine != 34);
-	set_check("echo_buffer_hack", Settings.SeparateEchoBuffer);
 	set_combo("sound_filter", Settings.InterpolationMethod);
 #endif
 }
@@ -566,7 +564,6 @@ void Snes9xPreferences::get_settings_from_dialog() {
 		Settings.MaxSpriteTilesPerLine = 34;
 	}
 
-	Settings.SeparateEchoBuffer = get_check("echo_buffer_hack");
 	Settings.InterpolationMethod = get_combo("sound_filter");
 #endif
 

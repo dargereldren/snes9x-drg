@@ -24,6 +24,7 @@
 #ifdef DEBUGGER
 #include "debug.h"
 extern FILE	*trace;
+extern FILE	*dumpops;
 #endif
 
 #define S9X_CONF_FILE_NAME	"snes9x.conf"
@@ -418,6 +419,7 @@ void S9xUsage (void)
 #ifdef DEBUGGER
 	S9xMessage(S9X_INFO, S9X_USAGE, "-debug                          Set the Debugger flag");
 	S9xMessage(S9X_INFO, S9X_USAGE, "-trace                          Begin CPU instruction tracing");
+	S9xMessage(S9X_INFO, S9X_USAGE, "-dumpops                        Dump executed 65816 opcodes to dumpops.log");
 #endif
 	S9xMessage(S9X_INFO, S9X_USAGE, "-hdmatiming <1-199>             (Not recommended) Changes HDMA transfer timings");
 	S9xMessage(S9X_INFO, S9X_USAGE, "                                event comes");
@@ -685,6 +687,15 @@ char * S9xParseArgs (char **argv, int argc)
 			{
 				ENSURE_TRACE_OPEN(trace,"trace.log","wb")
 				CPU.Flags |= TRACE_FLAG;
+			}
+			else
+			if (!strcasecmp(argv[i], "-dumpops"))
+			{
+				ENSURE_TRACE_OPEN(dumpops, "dumpops.log", "wb")
+				/* Unbuffered so last ops survive a crash while debugging. */
+				if (dumpops)
+					setvbuf(dumpops, NULL, _IONBF, 0);
+				Settings.DumpOps = TRUE;
 			}
 			else
 		#endif

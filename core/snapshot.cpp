@@ -478,7 +478,25 @@ static FreezeData	SnapFX[] =
 	ARRAY_ENTRY(6, avCacheBackup, 512, uint8_ARRAY_V),
 	INT_ENTRY(6, vCounter),
 	INT_ENTRY(6, vInstCount),
-	INT_ENTRY(6, vSCBRDirty)
+	INT_ENTRY(6, vSCBRDirty),
+	// Super FX 4
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, vRngState),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.input),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.valid_bits),
+	ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, decomp.bit_ctr, 8, uint8_ARRAY_V),
+	ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, decomp.context_states, 32, uint8_ARRAY_V),
+	ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, decomp.context_MPS, 32, uint8_ARRAY_V),
+	ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, decomp.prev_bits, 8, uint16_ARRAY_V),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.num_planes),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.bitplane_type),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.high_context_bits),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.low_context_bits),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.plane),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.yloc),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.raw),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.next_byte),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.have_next),
+	INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.active)
 };
 
 #undef STRUCT
@@ -1734,6 +1752,47 @@ int S9xUnfreezeFromStream (STREAM stream)
 		{
 			GSU.pfPlot = fx_PlotTable[GSU.vMode];
 			GSU.pfRpix = fx_PlotTable[GSU.vMode + 5];
+			// Re-apply cart-derived FX flags and bank tables (not authoritative in snapshot)
+			GSU.bFx3 = SuperFX.isFx3;
+			GSU.bFx4 = SuperFX.isFx4;
+			GSU.bSeparateGsuRom = SuperFX.hasSeparateGsuRom;
+			GSU.pvRegisters = SuperFX.pvRegisters;
+			GSU.pvRam = SuperFX.pvRam;
+			if (GSU.bFx4)
+			{
+				uint8 *gsuRom = SuperFX.pvRom;
+				uint32 gsuRomSize = Memory.CalculatedSize;
+				if (GSU.bSeparateGsuRom && Memory.CalculatedSize > FX4_GSU_ROM_OFFSET)
+				{
+					gsuRom = SuperFX.pvRom + FX4_GSU_ROM_OFFSET;
+					gsuRomSize = Memory.CalculatedSize - FX4_GSU_ROM_OFFSET;
+				}
+				else if (GSU.bSeparateGsuRom)
+				{
+					gsuRom = SuperFX.pvRom + FX4_GSU_ROM_OFFSET;
+					gsuRomSize = 0;
+				}
+				GSU.pvRom = gsuRom;
+				GSU.nRomBanks = gsuRomSize ? ((gsuRomSize + 0xffff) >> 16) : 1;
+				if (GSU.nRomBanks > 256)
+					GSU.nRomBanks = 256;
+				if (GSU.nRamBanks < 1)
+					GSU.nRamBanks = SuperFX.nRamBanks ? SuperFX.nRamBanks : 1;
+				for (int i = 0; i < 256; i++)
+					GSU.apvRomBank[i] = &GSU.pvRom[((uint32) i % GSU.nRomBanks) << 16];
+				for (int i = 0; i < FX4_RAM_BANKS; i++)
+					GSU.apvRamBankFx4[i] = &GSU.pvRam[((uint32) i % GSU.nRamBanks) << 16];
+				GSU.pvRamBank = GSU.apvRamBankFx4[GSU.vRamBankReg % GSU.nRamBanks];
+				GSU.pvCache = &GSU.pvRegisters[0x40];
+			}
+			else
+			{
+				GSU.pvRom = SuperFX.pvRom;
+				GSU.pvCache = &GSU.pvRegisters[0x100];
+			}
+			GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg & 0xff];
+			GSU.pvPrgBank = GSU.apvRomBank[GSU.vPrgBankReg & 0xff];
+			fx_applyOpcodeTable();
 		}
 
 		if (local_sa1 && local_sa1_registers)

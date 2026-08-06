@@ -69,11 +69,11 @@ void S9xSetSuperFX (uint8 byte, uint16 address)
 			break;
 
 		case 0x3034:
-			Memory.FillRAM[0x3034] = byte & 0x7f;
+			Memory.FillRAM[0x3034] = SuperFX.isFx4 ? byte : (byte & 0x7f);
 			break;
 
 		case 0x3036:
-			Memory.FillRAM[0x3036] = byte & 0x7f;
+			Memory.FillRAM[0x3036] = SuperFX.isFx4 ? byte : (byte & 0x7f);
 			break;
 
 		case 0x3037:
@@ -118,7 +118,8 @@ void S9xSetSuperFX (uint8 byte, uint16 address)
 
 		default:
 			Memory.FillRAM[address] = byte;
-			if (address >= 0x3100)
+			if (SuperFX.isFx4 ? (address >= 0x3040 && address <= 0x3fff)
+			                 : (address >= 0x3100))
 				FxCacheWriteAccess(address);
 
 			break;
@@ -142,10 +143,12 @@ uint8 S9xGetSuperFX (uint16 address)
 
 void S9xSuperFXExec (void)
 {
-	// FX3: the CPU keeps ROM/RAM access, so SCMR RON/RAN don't gate execution
-	if ((Memory.FillRAM[0x3000 + GSU_SFR] & FLG_G) && (SuperFX.isFx3 || (Memory.FillRAM[0x3000 + GSU_SCMR] & 0x18) != 0))
+	// FX3/FX4: the CPU keeps ROM/RAM access, so SCMR RON/RAN don't gate execution
+	if ((Memory.FillRAM[0x3000 + GSU_SFR] & FLG_G) &&
+	    (SuperFX.isFx3 || SuperFX.isFx4 || (Memory.FillRAM[0x3000 + GSU_SCMR] & 0x18) != 0))
 	{
-		FxEmulate(((Memory.FillRAM[0x3000 + GSU_CLSR] & 1) ? (SuperFX.speedPerLine * 5 / 2) : SuperFX.speedPerLine) * (SuperFX.isFx3 ? 4 : 1) * Settings.SuperFXClockMultiplier / 100);
+		int clockMul = (SuperFX.isFx3 || SuperFX.isFx4) ? 4 : 1;
+		FxEmulate(((Memory.FillRAM[0x3000 + GSU_CLSR] & 1) ? (SuperFX.speedPerLine * 5 / 2) : SuperFX.speedPerLine) * clockMul * Settings.SuperFXClockMultiplier / 100);
 
 		uint16 GSUStatus = Memory.FillRAM[0x3000 + GSU_SFR] | (Memory.FillRAM[0x3000 + GSU_SFR + 1] << 8);
 		if ((GSUStatus & (FLG_G | FLG_IRQ)) == FLG_IRQ)
@@ -168,54 +171,114 @@ static void FxReset (struct FxInfo_s *psFxInfo)
 	GSU.nRomBanks         = psFxInfo->nRomBanks;
 	GSU.pvRom             = psFxInfo->pvRom;
 	GSU.bFx3              = psFxInfo->isFx3;
+	GSU.bFx4              = psFxInfo->isFx4;
+	GSU.bSeparateGsuRom   = psFxInfo->hasSeparateGsuRom;
 	GSU.vPrevScreenHeight = ~0;
 	GSU.vPrevMode         = ~0;
 
-	// The GSU can't access more than 2mb (16mbits); the FX3 sees 4mb
-	uint32	maxBanks = GSU.bFx3 ? 0x40 : 0x20;
-	if (GSU.nRomBanks > maxBanks)
-		GSU.nRomBanks = maxBanks;
-
-	// Clear FxChip register space
-	memset(GSU.pvRegisters, 0, 0x300);
-
-	// Set FxChip version Number
-	GSU.pvRegisters[0x3b] = GSU.bFx3 ? 0x52 : 0;
-
-	// Make ROM bank table
-	for (int i = 0; i < 256; i++)
+	if (GSU.bFx4)
 	{
-		uint32	b = i & 0x7f;
+		// FX4: linear 64KB ROM banks; optional private GSU ROM at +0xB80000
+		uint8	*gsuRom = GSU.pvRom;
+		uint32	gsuRomSize = Memory.CalculatedSize;
 
-		if (b >= 0x40)
+		if (GSU.bSeparateGsuRom)
 		{
-			if (GSU.nRomBanks > 1)
-				b %= GSU.nRomBanks;
+			if (Memory.CalculatedSize > FX4_GSU_ROM_OFFSET)
+			{
+				gsuRom = GSU.pvRom + FX4_GSU_ROM_OFFSET;
+				gsuRomSize = Memory.CalculatedSize - FX4_GSU_ROM_OFFSET;
+			}
 			else
-				b &= 1;
+			{
+				// No extra payload: empty/open bus style (still point past cart)
+				gsuRom = GSU.pvRom + FX4_GSU_ROM_OFFSET;
+				gsuRomSize = 0;
+			}
+		}
 
+		GSU.pvRom = gsuRom;
+		// nRomBanks as number of 64KB banks
+		GSU.nRomBanks = gsuRomSize ? ((gsuRomSize + 0xffff) >> 16) : 1;
+		if (GSU.nRomBanks < 1)
+			GSU.nRomBanks = 1;
+		if (GSU.nRomBanks > 256)
+			GSU.nRomBanks = 256;
+
+		if (GSU.nRamBanks < 1)
+			GSU.nRamBanks = 1;
+		if (GSU.nRamBanks > FX4_RAM_BANKS)
+			GSU.nRamBanks = FX4_RAM_BANKS;
+
+		// Clear register file + 4KB cache window ($3000/$3FFF)
+		memset(GSU.pvRegisters, 0, 0x1000);
+		GSU.pvRegisters[0x3b] = 0x54; // VCR
+
+		// Linear ROM banks $00/$FF
+		for (int i = 0; i < 256; i++)
+		{
+			uint32 b = (uint32) i % GSU.nRomBanks;
 			GSU.apvRomBank[i] = &GSU.pvRom[b << 16];
 		}
-		else
-		{
-			b %= GSU.nRomBanks * 2;
-			GSU.apvRomBank[i] = &GSU.pvRom[(b << 16) + FX_MEMORY_32K_MIRRORS];
-		}
-	}
 
-	// Make RAM bank table
-	for (int i = 0; i < 4; i++)
+		// Linear RAM banks (full SRAM)
+		for (int i = 0; i < FX4_RAM_BANKS; i++)
+			GSU.apvRamBankFx4[i] = &GSU.pvRam[((uint32) i % GSU.nRamBanks) << 16];
+
+		// Keep classic 4-entry table in sync for any shared paths / snapshots
+		for (int i = 0; i < FX_RAM_BANKS; i++)
+			GSU.apvRamBank[i] = GSU.apvRamBankFx4[i % GSU.nRamBanks];
+
+		GSU.pvCache = &GSU.pvRegisters[0x40]; // $3040
+	}
+	else
 	{
-		GSU.apvRamBank[i] = &GSU.pvRam[(i % GSU.nRamBanks) << 16];
-		GSU.apvRomBank[0x70 + i] = GSU.apvRamBank[i];
+		// The GSU can't access more than 2mb (16mbits); the FX3 sees 4mb
+		uint32	maxBanks = GSU.bFx3 ? 0x40 : 0x20;
+		if (GSU.nRomBanks > maxBanks)
+			GSU.nRomBanks = maxBanks;
+
+		// Clear FxChip register space
+		memset(GSU.pvRegisters, 0, 0x300);
+
+		// Set FxChip version Number
+		GSU.pvRegisters[0x3b] = GSU.bFx3 ? 0x52 : 0;
+
+		// Make ROM bank table (classic 32K mirrors for low banks)
+		for (int i = 0; i < 256; i++)
+		{
+			uint32	b = i & 0x7f;
+
+			if (b >= 0x40)
+			{
+				if (GSU.nRomBanks > 1)
+					b %= GSU.nRomBanks;
+				else
+					b &= 1;
+
+				GSU.apvRomBank[i] = &GSU.pvRom[b << 16];
+			}
+			else
+			{
+				b %= GSU.nRomBanks * 2;
+				GSU.apvRomBank[i] = &GSU.pvRom[(b << 16) + FX_MEMORY_32K_MIRRORS];
+			}
+		}
+
+		// Make RAM bank table
+		for (int i = 0; i < 4; i++)
+		{
+			GSU.apvRamBank[i] = &GSU.pvRam[(i % GSU.nRamBanks) << 16];
+			GSU.apvRomBank[0x70 + i] = GSU.apvRamBank[i];
+		}
+
+		GSU.pvCache = &GSU.pvRegisters[0x100];
 	}
 
 	// Start with a nop in the pipe
 	GSU.vPipe = 0x01;
 
-	// Set pointer to GSU cache
-	GSU.pvCache = &GSU.pvRegisters[0x100];
-
+	fx_applyOpcodeTable();
 	fx_readRegisterSpace();
 }
 
@@ -239,7 +302,8 @@ static void fx_readRegisterSpace (void)
 	GSU.vStatusReg     =  (uint32) READ_WORD(&p[GSU_SFR]);
 	GSU.vPrgBankReg    =  (uint32) p[GSU_PBR];
 	GSU.vRomBankReg    =  (uint32) p[GSU_ROMBR];
-	GSU.vRamBankReg    = ((uint32) p[GSU_RAMBR]) & (FX_RAM_BANKS - 1);
+	GSU.vRamBankReg    = GSU.bFx4 ? (uint32) p[GSU_RAMBR]
+	                             : ((uint32) p[GSU_RAMBR]) & (FX_RAM_BANKS - 1);
 	GSU.vCacheBaseReg  =  (uint32) p[GSU_CBR];
 	GSU.vCacheBaseReg |= ((uint32) p[GSU_CBR + 1]) << 8;
 
@@ -250,9 +314,15 @@ static void fx_readRegisterSpace (void)
 	GSU.vCarry    =  (GSU.vStatusReg & FLG_CY) >> 2;
 
 	// Set bank pointers
-	GSU.pvRamBank = GSU.apvRamBank[GSU.vRamBankReg & 0x3];
-	GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg];
-	GSU.pvPrgBank = GSU.apvRomBank[GSU.vPrgBankReg];
+	if (GSU.bFx4)
+	{
+		GSU.vRamBankReg &= 0xff;
+		GSU.pvRamBank = GSU.apvRamBankFx4[GSU.vRamBankReg % (GSU.nRamBanks ? GSU.nRamBanks : 1)];
+	}
+	else
+		GSU.pvRamBank = GSU.apvRamBank[GSU.vRamBankReg & 0x3];
+	GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg & 0xff];
+	GSU.pvPrgBank = GSU.apvRomBank[GSU.vPrgBankReg & 0xff];
 
 	// Set screen pointers
 	GSU.pvScreenBase = &GSU.pvRam[USEX8(p[GSU_SCBR]) << 10];
@@ -327,9 +397,16 @@ static void fx_writeRegisterSpace (void)
 // Update RamBankReg and RAM Bank pointer
 static void fx_updateRamBank (uint8 byte)
 {
-	// Update BankReg and Bank pointer
-	GSU.vRamBankReg = (uint32) byte & (FX_RAM_BANKS - 1);
-	GSU.pvRamBank = GSU.apvRamBank[byte & 0x3];
+	if (GSU.bFx4)
+	{
+		GSU.vRamBankReg = (uint32) byte;
+		GSU.pvRamBank = GSU.apvRamBankFx4[byte % (GSU.nRamBanks ? GSU.nRamBanks : 1)];
+	}
+	else
+	{
+		GSU.vRamBankReg = (uint32) byte & (FX_RAM_BANKS - 1);
+		GSU.pvRamBank = GSU.apvRamBank[byte & 0x3];
+	}
 }
 
 // SCBR write seen. We need to update our cached screen pointers
@@ -340,8 +417,14 @@ static void fx_dirtySCBR (void)
 
 static bool8 fx_checkStartAddress (void)
 {
+	uint32 cacheSize = GSU.bFx4 ? FX4_CACHE_SIZE : 512;
+
 	// Check if we start inside the cache
-	if (GSU.bCacheActive && R15 >= GSU.vCacheBaseReg && R15 < (GSU.vCacheBaseReg + 512))
+	if (GSU.bCacheActive && R15 >= GSU.vCacheBaseReg && R15 < (GSU.vCacheBaseReg + cacheSize))
+		return true;
+
+	// FX4: no bus arbitration; full linear ROM space
+	if (GSU.bFx4)
 		return true;
 
 	// FX3: no bus arbitration, any ROM (<= 0x6f) or RAM (0x70-0x71) bank runs

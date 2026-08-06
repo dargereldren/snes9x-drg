@@ -125,14 +125,39 @@
  *
  */
 
-// Number of banks in GSU RAM
+// Number of banks in classic GSU RAM (frozen in snapshots)
 #define FX_RAM_BANKS	4
+// Super FX 4 linear RAM: up to 16MB = 256 × 64KB banks
+#define FX4_RAM_BANKS	256
+#define FX4_CACHE_SIZE	4096
+#define FX4_GSU_ROM_OFFSET	0xB80000
 
 // Emulate proper R14 ROM access (slower, but safer)
 #define FX_DO_ROMBUFFER
 
 // Address checking (definately slow)
 //#define FX_ADDRESS_CHECK
+
+// Super FX 4 internal SDD-1-style streaming decompressor state
+struct Fx4Decomp_s
+{
+	uint16	input;
+	int8	valid_bits;
+	uint8	bit_ctr[8];
+	uint8	context_states[32];
+	uint8	context_MPS[32];
+	uint16	prev_bits[8];
+	uint8	num_planes;		// 0, 2, 4, or 8 (0 = bitplane type 3 / raw)
+	uint8	bitplane_type;	// 0-3 from header
+	uint16	high_context_bits;
+	uint16	low_context_bits;
+	uint8	plane;
+	uint8	yloc;
+	uint8	raw;
+	uint8	next_byte;
+	uint8	have_next;		// deferred second byte for plane modes
+	uint8	active;
+};
 
 struct FxRegs_s
 {
@@ -167,11 +192,11 @@ struct FxRegs_s
 	uint32	vBreakPoint;
 	uint32	vStepPoint;
 
-	uint8	*pvRegisters;				// 768 bytes located in the memory at address 0x3000
+	uint8	*pvRegisters;				// Register + cache space at 0x3000
 	uint32	nRamBanks;					// Number of 64kb-banks in FxRam (Don't confuse it with SNES-Ram!!!)
 	uint8	*pvRam;						// Pointer to FxRam
-	uint32	nRomBanks;					// Number of 32kb-banks in Cart-ROM
-	uint8	*pvRom;						// Pointer to Cart-ROM
+	uint32	nRomBanks;					// Number of 32kb-banks in Cart-ROM (FX4: 64kb banks)
+	uint8	*pvRom;						// Pointer to Cart-ROM (FX4: GSU ROM base)
 
 	uint32	vMode;						// Color depth/mode
 	uint32	vPrevMode;					// Previous depth
@@ -189,7 +214,7 @@ struct FxRegs_s
 	uint8	*pvRomBank;					// Pointer to current ROM-bank
 	uint8	*pvPrgBank;					// Pointer to current program ROM-bank
 
-	uint8	*apvRamBank[FX_RAM_BANKS];	// Ram bank table (max 256kb)
+	uint8	*apvRamBank[FX_RAM_BANKS];	// Classic ram bank table (max 256kb; snapshot)
 	uint8	*apvRomBank[256];			// Rom bank table
 
 	uint8	bCacheActive;
@@ -202,7 +227,17 @@ struct FxRegs_s
 	uint8	*avRegAddr;					// To reference avReg in snapshot.cpp
 
 	uint8	bFx3;						// Super FX 3 behavior (not in snapshots; set from cart)
+
+	// --- Super FX 4 / GIGA-1 (fields after bFx3 keep classic snapshot offsets stable) ---
+	uint8	bFx4;
+	uint8	bSeparateGsuRom;
+	uint8	*apvRamBankFx4[FX4_RAM_BANKS];
+	uint32	vRngState;
+	struct Fx4Decomp_s	decomp;
 };
+
+// Install / restore FX4 opcode table patches (called from FxReset)
+void fx_applyOpcodeTable (void);
 
 extern struct FxRegs_s	GSU;
 

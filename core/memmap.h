@@ -19,7 +19,7 @@
 struct CMemory
 {
 	enum
-	{ MAX_ROM_SIZE = 0x1000000 };
+	{ MAX_ROM_SIZE = 0x2000000 };	// 32MB: SuperFX 4 carts up to ~27.5MB
 
 	enum file_formats
 	{ FILE_ZIP, FILE_JMA, FILE_DEFAULT };
@@ -62,7 +62,8 @@ struct CMemory
 	uint8   *ROM;
 	std::vector<uint8_t> SRAMStorage;
 	uint8	*SRAM;
-	const size_t SRAM_SIZE = 0x80000;
+	// 16MB max for SuperFX 4 GSU-only SRAM (SCPU sees 384KB at $78-$7D)
+	const size_t SRAM_SIZE = 0x1000000;
 	uint8	VRAM[0x10000];
 	uint8	*FillRAM;
 	uint8	*BWRAM;
@@ -155,6 +156,7 @@ struct CMemory
 	void	Map_SufamiTurboPseudoLoROMMap (void);
 	void	Map_SuperFXLoROMMap (void);
 	void	Map_SuperFX3LoROMMap (void);
+	void	Map_SuperFX4LoROMMap (void);
 	void	Map_SetaDSPLoROMMap (void);
 	void	Map_SDD1LoROMMap (void);
 	void	Map_SA1LoROMMap (void);

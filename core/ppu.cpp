@@ -951,7 +951,14 @@ void S9xSetPPU (uint8 Byte, uint16 Address)
 	}
 	else
 	{
-		if (Settings.SuperFX && !SuperFX.isFx3 && Address >= 0x3000 && Address <= 0x32ff)
+		if (Settings.SuperFX && SuperFX.isFx4 && Address >= 0x3000 && Address <= 0x3fff)
+		{
+			// FX4: registers $3000-$303F + 4KB cache $3040-$3FFF
+			S9xSetSuperFX(Byte, Address);
+			return;
+		}
+		else
+		if (Settings.SuperFX && !SuperFX.isFx3 && !SuperFX.isFx4 && Address >= 0x3000 && Address <= 0x32ff)
 		{
 			S9xSetSuperFX(Byte, Address);
 			return;
@@ -1214,7 +1221,10 @@ uint8 S9xGetPPU (uint16 Address)
 	}
 	else
     {
-		if (Settings.SuperFX && !SuperFX.isFx3 && Address >= 0x3000 && Address <= 0x32ff)
+		if (Settings.SuperFX && SuperFX.isFx4 && Address >= 0x3000 && Address <= 0x3fff)
+			return (S9xGetSuperFX(Address));
+		else
+		if (Settings.SuperFX && !SuperFX.isFx3 && !SuperFX.isFx4 && Address >= 0x3000 && Address <= 0x32ff)
 			return (S9xGetSuperFX(Address));
 		else
 		if (Settings.SuperFX && SuperFX.isFx3 && Address >= 0x7000)

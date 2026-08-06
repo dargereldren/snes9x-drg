@@ -6,7 +6,7 @@ include(GNUInstallDirs)
 set(SNES9X_PORT "GTK" CACHE STRING "Port to build snes9x with")
 
 # System
-option(DEBUGGER "Enable Snes9x Debugger" ON)
+option(DEBUGGER "Enable Snes9x Debugger" OFF)
 option(HAVE_NETPLAY "Build support for Netplay" ON)
 
 # Sound
@@ -122,6 +122,11 @@ endif()
 # Netplay
 if(HAVE_NETPLAY)
 	list(APPEND DEFINES "NETPLAY_SUPPORT")
+endif()
+
+# Debugger
+if(DEBUGGER)
+	list(APPEND DEFINES "DEBUGGER")
 endif()
 
 # Unzip

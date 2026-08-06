@@ -197,6 +197,7 @@ struct SSettings
 	bool8	TraceDSP;
 	bool8	TraceHCEvent;
 	bool8	TraceSMP;
+	bool8	DumpOps;
 
 	bool8	SuperFX;
 	uint8	DSP;

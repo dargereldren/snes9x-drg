@@ -38,8 +38,8 @@ static void fx_stop (void)
 	CLRFLAGS;
 	R15++;
 
-	// The FX3 resets R15 on STOP so the CPU can poll it for completion
-	if (GSU.bFx3)
+	// FX3/FX4 reset R15 on STOP so the CPU can poll it for completion
+	if (GSU.bFx3 || GSU.bFx4)
 		R15 = 0;
 }
 
@@ -2649,7 +2649,7 @@ static void fx_jmp_r13 (void)
 
 // 98-9d (ALT1) - ljmp rn - set program bank to source register and jump to address of register
 #define FX_LJMP(reg) \
-	GSU.vPrgBankReg = GSU.avReg[reg] & 0x7f; \
+	GSU.vPrgBankReg = GSU.bFx4 ? (GSU.avReg[reg] & 0xff) : (GSU.avReg[reg] & 0x7f); \
 	GSU.pvPrgBank = GSU.apvRomBank[GSU.vPrgBankReg]; \
 	R15 = SREG; \
 	GSU.bCacheActive = FALSE; \
@@ -3566,8 +3566,16 @@ static void fx_getc (void)
 // df (ALT2) - ramb - set current RAM bank
 static void fx_ramb (void)
 {
-	GSU.vRamBankReg = SREG & (FX_RAM_BANKS - 1);
-	GSU.pvRamBank = GSU.apvRamBank[GSU.vRamBankReg & 0x3];
+	if (GSU.bFx4)
+	{
+		GSU.vRamBankReg = USEX8(SREG);
+		GSU.pvRamBank = GSU.apvRamBankFx4[GSU.vRamBankReg % (GSU.nRamBanks ? GSU.nRamBanks : 1)];
+	}
+	else
+	{
+		GSU.vRamBankReg = SREG & (FX_RAM_BANKS - 1);
+		GSU.pvRamBank = GSU.apvRamBank[GSU.vRamBankReg & 0x3];
+	}
 	CLRFLAGS;
 	R15++;
 }
@@ -3575,7 +3583,10 @@ static void fx_ramb (void)
 // df (ALT3) - romb - set current ROM bank
 static void fx_romb (void)
 {
-	GSU.vRomBankReg = USEX8(SREG) & 0x7f;
+	if (GSU.bFx4)
+		GSU.vRomBankReg = USEX8(SREG);
+	else
+		GSU.vRomBankReg = USEX8(SREG) & 0x7f;
 	GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg];
 	CLRFLAGS;
 	R15++;
@@ -4009,6 +4020,764 @@ static void fx_sm_r14 (void)
 static void fx_sm_r15 (void)
 {
 	FX_SM(15);
+}
+
+// ---------------------------------------------------------------------------
+// Super FX 4 / GIGA-1 extensions
+// ---------------------------------------------------------------------------
+
+static void fx4_burn (uint32 extra)
+{
+	if (GSU.vCounter > extra)
+		GSU.vCounter -= extra;
+	else
+		GSU.vCounter = 0;
+}
+
+// ALT1 $20+n - UDIV Rn: Dest = Src / Reg (unsigned)
+#define FX4_UDIV(reg) \
+	do { \
+		uint32 dividend = USEX16(SREG); \
+		uint32 divisor  = USEX16(GSU.avReg[reg]); \
+		uint32 v = divisor ? (dividend / divisor) : 0xFFFF; \
+		R15++; \
+		DREG = v; \
+		GSU.vSign = v; \
+		GSU.vZero = v; \
+		TESTR14; \
+		CLRFLAGS; \
+		fx4_burn(18); \
+	} while (0)
+
+static void fx4_udiv_r0  (void) { FX4_UDIV( 0); }
+static void fx4_udiv_r1  (void) { FX4_UDIV( 1); }
+static void fx4_udiv_r2  (void) { FX4_UDIV( 2); }
+static void fx4_udiv_r3  (void) { FX4_UDIV( 3); }
+static void fx4_udiv_r4  (void) { FX4_UDIV( 4); }
+static void fx4_udiv_r5  (void) { FX4_UDIV( 5); }
+static void fx4_udiv_r6  (void) { FX4_UDIV( 6); }
+static void fx4_udiv_r7  (void) { FX4_UDIV( 7); }
+static void fx4_udiv_r8  (void) { FX4_UDIV( 8); }
+static void fx4_udiv_r9  (void) { FX4_UDIV( 9); }
+static void fx4_udiv_r10 (void) { FX4_UDIV(10); }
+static void fx4_udiv_r11 (void) { FX4_UDIV(11); }
+static void fx4_udiv_r12 (void) { FX4_UDIV(12); }
+static void fx4_udiv_r13 (void) { FX4_UDIV(13); }
+static void fx4_udiv_r14 (void) { FX4_UDIV(14); }
+static void fx4_udiv_r15 (void) { FX4_UDIV(15); }
+
+// ALT2 $20+n - DIV Rn: Dest = Src / Reg (signed)
+#define FX4_DIV(reg) \
+	do { \
+		int32 dividend = SEX16(SREG); \
+		int32 divisor  = SEX16(GSU.avReg[reg]); \
+		uint32 v; \
+		if (divisor == 0) \
+			v = 0xFFFF; \
+		else \
+			v = USEX16((uint32) (dividend / divisor)); \
+		R15++; \
+		DREG = v; \
+		GSU.vSign = v; \
+		GSU.vZero = v; \
+		TESTR14; \
+		CLRFLAGS; \
+		fx4_burn(20); \
+	} while (0)
+
+static void fx4_div_r0  (void) { FX4_DIV( 0); }
+static void fx4_div_r1  (void) { FX4_DIV( 1); }
+static void fx4_div_r2  (void) { FX4_DIV( 2); }
+static void fx4_div_r3  (void) { FX4_DIV( 3); }
+static void fx4_div_r4  (void) { FX4_DIV( 4); }
+static void fx4_div_r5  (void) { FX4_DIV( 5); }
+static void fx4_div_r6  (void) { FX4_DIV( 6); }
+static void fx4_div_r7  (void) { FX4_DIV( 7); }
+static void fx4_div_r8  (void) { FX4_DIV( 8); }
+static void fx4_div_r9  (void) { FX4_DIV( 9); }
+static void fx4_div_r10 (void) { FX4_DIV(10); }
+static void fx4_div_r11 (void) { FX4_DIV(11); }
+static void fx4_div_r12 (void) { FX4_DIV(12); }
+static void fx4_div_r13 (void) { FX4_DIV(13); }
+static void fx4_div_r14 (void) { FX4_DIV(14); }
+static void fx4_div_r15 (void) { FX4_DIV(15); }
+
+// ALT3 $20+n - MOD Rn: Dest = Src % Reg (unsigned)
+#define FX4_MOD(reg) \
+	do { \
+		uint32 dividend = USEX16(SREG); \
+		uint32 divisor  = USEX16(GSU.avReg[reg]); \
+		uint32 v = divisor ? (dividend % divisor) : 0xFFFF; \
+		R15++; \
+		DREG = v; \
+		GSU.vSign = v; \
+		GSU.vZero = v; \
+		TESTR14; \
+		CLRFLAGS; \
+		fx4_burn(18); \
+	} while (0)
+
+static void fx4_mod_r0  (void) { FX4_MOD( 0); }
+static void fx4_mod_r1  (void) { FX4_MOD( 1); }
+static void fx4_mod_r2  (void) { FX4_MOD( 2); }
+static void fx4_mod_r3  (void) { FX4_MOD( 3); }
+static void fx4_mod_r4  (void) { FX4_MOD( 4); }
+static void fx4_mod_r5  (void) { FX4_MOD( 5); }
+static void fx4_mod_r6  (void) { FX4_MOD( 6); }
+static void fx4_mod_r7  (void) { FX4_MOD( 7); }
+static void fx4_mod_r8  (void) { FX4_MOD( 8); }
+static void fx4_mod_r9  (void) { FX4_MOD( 9); }
+static void fx4_mod_r10 (void) { FX4_MOD(10); }
+static void fx4_mod_r11 (void) { FX4_MOD(11); }
+static void fx4_mod_r12 (void) { FX4_MOD(12); }
+static void fx4_mod_r13 (void) { FX4_MOD(13); }
+static void fx4_mod_r14 (void) { FX4_MOD(14); }
+static void fx4_mod_r15 (void) { FX4_MOD(15); }
+
+// ALT2 $30+n - WMULT Rn: low 16 of signed 16x16 (no R4/R6)
+#define FX4_WMULT(reg) \
+	do { \
+		uint32 c = (uint32) (SEX16(SREG) * SEX16(GSU.avReg[reg])); \
+		uint32 v = USEX16(c); \
+		R15++; \
+		DREG = v; \
+		GSU.vSign = v; \
+		GSU.vZero = v; \
+		TESTR14; \
+		CLRFLAGS; \
+	} while (0)
+
+static void fx4_wmult_r0  (void) { FX4_WMULT( 0); }
+static void fx4_wmult_r1  (void) { FX4_WMULT( 1); }
+static void fx4_wmult_r2  (void) { FX4_WMULT( 2); }
+static void fx4_wmult_r3  (void) { FX4_WMULT( 3); }
+static void fx4_wmult_r4  (void) { FX4_WMULT( 4); }
+static void fx4_wmult_r5  (void) { FX4_WMULT( 5); }
+static void fx4_wmult_r6  (void) { FX4_WMULT( 6); }
+static void fx4_wmult_r7  (void) { FX4_WMULT( 7); }
+static void fx4_wmult_r8  (void) { FX4_WMULT( 8); }
+static void fx4_wmult_r9  (void) { FX4_WMULT( 9); }
+static void fx4_wmult_r10 (void) { FX4_WMULT(10); }
+static void fx4_wmult_r11 (void) { FX4_WMULT(11); }
+
+// ALT2 $40+n - FPMULT Rn: high 16 of signed 16x16 (no R4/R6)
+#define FX4_FPMULT(reg) \
+	do { \
+		uint32 c = (uint32) (SEX16(SREG) * SEX16(GSU.avReg[reg])); \
+		uint32 v = c >> 16; \
+		R15++; \
+		DREG = v; \
+		GSU.vSign = v; \
+		GSU.vZero = v; \
+		GSU.vCarry = (c >> 15) & 1; \
+		TESTR14; \
+		CLRFLAGS; \
+	} while (0)
+
+static void fx4_fpmult_r0  (void) { FX4_FPMULT( 0); }
+static void fx4_fpmult_r1  (void) { FX4_FPMULT( 1); }
+static void fx4_fpmult_r2  (void) { FX4_FPMULT( 2); }
+static void fx4_fpmult_r3  (void) { FX4_FPMULT( 3); }
+static void fx4_fpmult_r4  (void) { FX4_FPMULT( 4); }
+static void fx4_fpmult_r5  (void) { FX4_FPMULT( 5); }
+static void fx4_fpmult_r6  (void) { FX4_FPMULT( 6); }
+static void fx4_fpmult_r7  (void) { FX4_FPMULT( 7); }
+static void fx4_fpmult_r8  (void) { FX4_FPMULT( 8); }
+static void fx4_fpmult_r9  (void) { FX4_FPMULT( 9); }
+static void fx4_fpmult_r10 (void) { FX4_FPMULT(10); }
+static void fx4_fpmult_r11 (void) { FX4_FPMULT(11); }
+
+// ALT3 $30+n - USTW (Rn): unaligned store word, wrap in bank
+#define FX4_USTW(reg) \
+	do { \
+		uint32 adr = USEX16(GSU.avReg[reg]); \
+		GSU.vLastRamAdr = adr; \
+		RAM(adr) = (uint8) SREG; \
+		RAM(USEX16(adr + 1)) = (uint8) (SREG >> 8); \
+		CLRFLAGS; \
+		R15++; \
+	} while (0)
+
+static void fx4_ustw_r0  (void) { FX4_USTW( 0); }
+static void fx4_ustw_r1  (void) { FX4_USTW( 1); }
+static void fx4_ustw_r2  (void) { FX4_USTW( 2); }
+static void fx4_ustw_r3  (void) { FX4_USTW( 3); }
+static void fx4_ustw_r4  (void) { FX4_USTW( 4); }
+static void fx4_ustw_r5  (void) { FX4_USTW( 5); }
+static void fx4_ustw_r6  (void) { FX4_USTW( 6); }
+static void fx4_ustw_r7  (void) { FX4_USTW( 7); }
+static void fx4_ustw_r8  (void) { FX4_USTW( 8); }
+static void fx4_ustw_r9  (void) { FX4_USTW( 9); }
+static void fx4_ustw_r10 (void) { FX4_USTW(10); }
+static void fx4_ustw_r11 (void) { FX4_USTW(11); }
+
+// ALT3 $40+n - ULDW (Rn): unaligned load word, wrap in bank
+#define FX4_ULDW(reg) \
+	do { \
+		uint32 adr = USEX16(GSU.avReg[reg]); \
+		uint32 v; \
+		GSU.vLastRamAdr = adr; \
+		v  = (uint32) RAM(adr); \
+		v |= ((uint32) RAM(USEX16(adr + 1))) << 8; \
+		R15++; \
+		DREG = v; \
+		TESTR14; \
+		CLRFLAGS; \
+	} while (0)
+
+static void fx4_uldw_r0  (void) { FX4_ULDW( 0); }
+static void fx4_uldw_r1  (void) { FX4_ULDW( 1); }
+static void fx4_uldw_r2  (void) { FX4_ULDW( 2); }
+static void fx4_uldw_r3  (void) { FX4_ULDW( 3); }
+static void fx4_uldw_r4  (void) { FX4_ULDW( 4); }
+static void fx4_uldw_r5  (void) { FX4_ULDW( 5); }
+static void fx4_uldw_r6  (void) { FX4_ULDW( 6); }
+static void fx4_uldw_r7  (void) { FX4_ULDW( 7); }
+static void fx4_uldw_r8  (void) { FX4_ULDW( 8); }
+static void fx4_uldw_r9  (void) { FX4_ULDW( 9); }
+static void fx4_uldw_r10 (void) { FX4_ULDW(10); }
+static void fx4_uldw_r11 (void) { FX4_ULDW(11); }
+
+// SDD-1 style streaming decompressor (GIGAFX4 / sdd1emu tables)
+static const uint8 fx4_evol_code_size[33] = {
+	0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,5,5,6,6,7,7,0,1,2,3,4,5,6,7
+};
+static const uint8 fx4_evol_mps_next[33] = {
+	25,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,24,26,27,28,29,30,31,32,24
+};
+static const uint8 fx4_evol_lps_next[33] = {
+	25,1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,1,2,4,8,12,16,18,22
+};
+static const uint8 fx4_run_table[128] = {
+	128,64,96,32,112,48,80,16,120,56,88,24,104,40,72,8,
+	124,60,92,28,108,44,76,12,116,52,84,20,100,36,68,4,
+	126,62,94,30,110,46,78,14,118,54,86,22,102,38,70,6,
+	122,58,90,26,106,42,74,10,114,50,82,18,98,34,66,2,
+	127,63,95,31,111,47,79,15,119,55,87,23,103,39,71,7,
+	123,59,91,27,107,43,75,11,115,51,83,19,99,35,67,3,
+	125,61,93,29,109,45,77,13,117,53,85,21,101,37,69,5,
+	121,57,89,25,105,41,73,9,113,49,81,17,97,33,65,1
+};
+
+static uint8 fx4_rom_read_inc (void)
+{
+	uint8 b = ROM(R14);
+	uint32 next = USEX16(R14 + 1);
+	if (next == 0)
+	{
+		GSU.vRomBankReg = (GSU.vRomBankReg + 1) & 0xff;
+		GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg];
+	}
+	R14 = next;
+	return b;
+}
+
+static uint8 fx4_GetCodeword (int code_size)
+{
+	struct Fx4Decomp_s *d = &GSU.decomp;
+	uint8 tmp;
+
+	if (d->valid_bits == 0)
+	{
+		d->input |= fx4_rom_read_inc();
+		d->valid_bits = 8;
+	}
+	d->input <<= 1;
+	d->valid_bits--;
+	// Match proven sdd1emu polarity
+	d->input ^= 0x8000;
+	if (d->input & 0x8000)
+		return (uint8) (0x80 + (1 << code_size));
+	tmp = (uint8) ((d->input >> 8) | (0x7f >> code_size));
+	d->input <<= code_size;
+	d->valid_bits = (int8) (d->valid_bits - code_size);
+	if (d->valid_bits < 0)
+	{
+		d->input |= (uint16) (fx4_rom_read_inc() << (-d->valid_bits));
+		d->valid_bits = (int8) (d->valid_bits + 8);
+	}
+	return fx4_run_table[tmp & 0x7f];
+}
+
+static uint8 fx4_ProbGetBit (uint8 context)
+{
+	struct Fx4Decomp_s *d = &GSU.decomp;
+	uint8 state = d->context_states[context];
+	uint8 code_size = fx4_evol_code_size[state];
+	uint8 pbit;
+
+	if ((d->bit_ctr[code_size] & 0x7f) == 0)
+		d->bit_ctr[code_size] = fx4_GetCodeword(code_size);
+
+	pbit = d->context_MPS[context];
+	d->bit_ctr[code_size]--;
+
+	if (d->bit_ctr[code_size] == 0)
+	{
+		d->context_states[context] = fx4_evol_lps_next[state];
+		pbit ^= 1;
+		if (state < 2)
+			d->context_MPS[context] = pbit;
+	}
+	else if (d->bit_ctr[code_size] == 0x80)
+	{
+		d->context_states[context] = fx4_evol_mps_next[state];
+	}
+
+	return pbit;
+}
+
+static uint8 fx4_GetBit (uint8 plane)
+{
+	struct Fx4Decomp_s *d = &GSU.decomp;
+	uint8 context = (uint8) (((plane & 1) << 4)
+		| ((d->prev_bits[plane] & d->high_context_bits) >> 5)
+		| (d->prev_bits[plane] & d->low_context_bits));
+	uint8 pbit = fx4_ProbGetBit(context);
+	d->prev_bits[plane] = (uint16) ((d->prev_bits[plane] << 1) + pbit);
+	if (d->num_planes == 0)
+		d->raw = (uint8) ((d->raw >> 1) + (pbit << 7));
+	return pbit;
+}
+
+// ALT2 $98 - BEGINDECOMP
+static void fx4_begindecomp (void)
+{
+	struct Fx4Decomp_s *d = &GSU.decomp;
+	uint8 hdr = fx4_rom_read_inc();
+	uint8 hdr2;
+
+	memset(d, 0, sizeof(*d));
+	d->active = 1;
+	d->bitplane_type = (uint8) (hdr >> 6);
+
+	switch (d->bitplane_type)
+	{
+		case 0: d->num_planes = 2; break;
+		case 1: d->num_planes = 8; break;
+		case 2: d->num_planes = 4; break;
+		default: d->num_planes = 0; break;
+	}
+
+	switch (hdr & 0x30)
+	{
+		case 0x00: d->high_context_bits = 0x01c0; d->low_context_bits = 0x0001; break;
+		case 0x10: d->high_context_bits = 0x0180; d->low_context_bits = 0x0001; break;
+		case 0x20: d->high_context_bits = 0x00c0; d->low_context_bits = 0x0001; break;
+		default:   d->high_context_bits = 0x0180; d->low_context_bits = 0x0003; break;
+	}
+
+	hdr2 = fx4_rom_read_inc();
+	d->input = (uint16) ((hdr << 11) | (hdr2 << 3));
+	d->valid_bits = 5;
+
+	CLRFLAGS;
+	R15++;
+	fx4_burn(40);
+}
+
+// ALT2 $99 - READCOMP: one decompressed byte -> DREG (GIGAFX4 decompress_byte)
+static void fx4_readcomp (void)
+{
+	struct Fx4Decomp_s *d = &GSU.decomp;
+	uint8 out = 0;
+	int i;
+
+	if (!d->active)
+	{
+		R15++;
+		DREG = 0;
+		GSU.vSign = 0;
+		GSU.vZero = 0;
+		TESTR14;
+		CLRFLAGS;
+		return;
+	}
+
+	if (d->num_planes == 0)
+	{
+		// bitplane type 3 / "raw" mode
+		d->raw = 0;
+		for (i = 0; i < 8; i++)
+			fx4_GetBit((uint8) i);
+		out = d->raw;
+	}
+	else if ((d->plane & 1) == 0)
+	{
+		for (i = 0; i < 8; i++)
+		{
+			fx4_GetBit(d->plane);
+			fx4_GetBit((uint8) (d->plane + 1));
+		}
+		out = (uint8) (d->prev_bits[d->plane] & 0xff);
+		d->plane = (uint8) (d->plane + 1);
+	}
+	else
+	{
+		out = (uint8) (d->prev_bits[d->plane] & 0xff);
+		d->plane = (uint8) (d->plane - 1);
+		d->yloc++;
+		if (d->yloc == 8)
+		{
+			d->yloc = 0;
+			d->plane = (uint8) ((d->plane + 2) & (d->num_planes - 1));
+		}
+	}
+
+	R15++;
+	DREG = USEX8(out);
+	GSU.vSign = USEX8(out) << 8;
+	GSU.vZero = USEX8(out) << 8;
+	TESTR14;
+	CLRFLAGS;
+	fx4_burn(8);
+}
+
+// ALT2 $9A - FX3CMD (reuse Super FX 3 command port)
+static void fx4_fx3cmd (void)
+{
+	fx3_command();
+	R15++;
+	CLRFLAGS;
+}
+
+// ALT2 $9B - RANDSEED
+static void fx4_randseed (void)
+{
+	GSU.vRngState = USEX16(SREG);
+	CLRFLAGS;
+	R15++;
+}
+
+// ALT2 $9C - RAND
+static void fx4_rand (void)
+{
+	uint32 v;
+	GSU.vRngState = GSU.vRngState * 1103515245u + 12345u;
+	v = (GSU.vRngState >> 16) & 0xffff;
+	R15++;
+	DREG = v;
+	GSU.vSign = v;
+	GSU.vZero = v;
+	TESTR14;
+	CLRFLAGS;
+}
+
+// ALT2 $9D + #byte - MEMSET: DREG=ptr, SREG=size, imm=fill
+static void fx4_memset (void)
+{
+	uint8 fill = PIPE;
+	uint32 size = USEX16(SREG);
+	uint32 adr = USEX16(DREG);
+	uint32 i;
+
+	R15++;
+	FETCHPIPE;
+	R15++;
+
+	for (i = 0; i < size; i++)
+	{
+		RAM(USEX16(adr + i)) = fill;
+	}
+
+	GSU.vLastRamAdr = USEX16(adr + (size ? size - 1 : 0));
+	CLRFLAGS;
+	// rough cost proportional to size, capped
+	fx4_burn(size > 200 ? 200 : size);
+}
+
+// ALT3 $98 + #byte - LSR #imm
+static void fx4_lsr_imm (void)
+{
+	uint8 n = PIPE;
+	uint32 v;
+	R15++;
+	FETCHPIPE;
+	R15++;
+	n &= 15;
+	if (n == 0)
+	{
+		v = USEX16(SREG);
+		GSU.vCarry = 0;
+	}
+	else
+	{
+		GSU.vCarry = (SREG >> (n - 1)) & 1;
+		v = USEX16(SREG) >> n;
+	}
+	DREG = v;
+	GSU.vSign = v;
+	GSU.vZero = v;
+	TESTR14;
+	CLRFLAGS;
+}
+
+// ALT3 $99 + #byte - ASR #imm
+static void fx4_asr_imm (void)
+{
+	uint8 n = PIPE;
+	int32 s;
+	uint32 v;
+	R15++;
+	FETCHPIPE;
+	R15++;
+	n &= 15;
+	s = SEX16(SREG);
+	if (n == 0)
+	{
+		v = USEX16(SREG);
+		GSU.vCarry = 0;
+	}
+	else
+	{
+		GSU.vCarry = (s >> (n - 1)) & 1;
+		v = USEX16((uint32) (s >> n));
+	}
+	DREG = v;
+	GSU.vSign = v;
+	GSU.vZero = v;
+	TESTR14;
+	CLRFLAGS;
+}
+
+// ALT3 $9A + #byte - ASL #imm
+static void fx4_asl_imm (void)
+{
+	uint8 n = PIPE;
+	uint32 v;
+	R15++;
+	FETCHPIPE;
+	R15++;
+	n &= 15;
+	if (n == 0)
+	{
+		v = USEX16(SREG);
+		GSU.vCarry = 0;
+	}
+	else
+	{
+		GSU.vCarry = (SREG >> (16 - n)) & 1;
+		v = USEX16(SREG << n);
+	}
+	DREG = v;
+	GSU.vSign = v;
+	GSU.vZero = v;
+	TESTR14;
+	CLRFLAGS;
+}
+
+// ALT3 $9B + #word - ADD #imm16
+static void fx4_add_word (void)
+{
+	uint32 imm = PIPE;
+	uint32 v;
+	R15++;
+	FETCHPIPE;
+	R15++;
+	imm |= USEX8(PIPE) << 8;
+	FETCHPIPE;
+	R15++;
+	v = USEX16(SREG) + imm;
+	GSU.vCarry = v >= 0x10000;
+	v = USEX16(v);
+	DREG = v;
+	GSU.vSign = v;
+	GSU.vZero = v;
+	GSU.vOverflow = (SREG ^ v) & (imm ^ v) & 0x8000;
+	TESTR14;
+	CLRFLAGS;
+}
+
+// ALT3 $9C + #word - ADC #imm16
+static void fx4_adc_word (void)
+{
+	uint32 imm = PIPE;
+	uint32 v;
+	R15++;
+	FETCHPIPE;
+	R15++;
+	imm |= USEX8(PIPE) << 8;
+	FETCHPIPE;
+	R15++;
+	v = USEX16(SREG) + imm + (GSU.vCarry & 1);
+	GSU.vCarry = v >= 0x10000;
+	v = USEX16(v);
+	DREG = v;
+	GSU.vSign = v;
+	GSU.vZero = v;
+	GSU.vOverflow = (SREG ^ v) & (imm ^ v) & 0x8000;
+	TESTR14;
+	CLRFLAGS;
+}
+
+// ALT3 $9D + #word - WMULT #imm16
+static void fx4_wmult_word (void)
+{
+	uint32 imm = PIPE;
+	uint32 c, v;
+	R15++;
+	FETCHPIPE;
+	R15++;
+	imm |= USEX8(PIPE) << 8;
+	FETCHPIPE;
+	R15++;
+	c = (uint32) (SEX16(SREG) * SEX16(imm));
+	v = USEX16(c);
+	DREG = v;
+	GSU.vSign = v;
+	GSU.vZero = v;
+	TESTR14;
+	CLRFLAGS;
+}
+
+// Patch ALT1/2/3 slots for FX4; restore classic handlers when not FX4.
+void fx_applyOpcodeTable (void)
+{
+	// Classic WITH (ALT1/2/3 $20/$2F) - restored when leaving FX4
+	static void (*const classic_with[16]) (void) = {
+		&fx_with_r0,  &fx_with_r1,  &fx_with_r2,  &fx_with_r3,
+		&fx_with_r4,  &fx_with_r5,  &fx_with_r6,  &fx_with_r7,
+		&fx_with_r8,  &fx_with_r9,  &fx_with_r10, &fx_with_r11,
+		&fx_with_r12, &fx_with_r13, &fx_with_r14, &fx_with_r15
+	};
+	static void (*const classic_stw[12]) (void) = {
+		&fx_stw_r0, &fx_stw_r1, &fx_stw_r2, &fx_stw_r3,
+		&fx_stw_r4, &fx_stw_r5, &fx_stw_r6, &fx_stw_r7,
+		&fx_stw_r8, &fx_stw_r9, &fx_stw_r10, &fx_stw_r11
+	};
+	static void (*const classic_ldw[12]) (void) = {
+		&fx_ldw_r0, &fx_ldw_r1, &fx_ldw_r2, &fx_ldw_r3,
+		&fx_ldw_r4, &fx_ldw_r5, &fx_ldw_r6, &fx_ldw_r7,
+		&fx_ldw_r8, &fx_ldw_r9, &fx_ldw_r10, &fx_ldw_r11
+	};
+	static void (*const classic_stb[12]) (void) = {
+		&fx_stb_r0, &fx_stb_r1, &fx_stb_r2, &fx_stb_r3,
+		&fx_stb_r4, &fx_stb_r5, &fx_stb_r6, &fx_stb_r7,
+		&fx_stb_r8, &fx_stb_r9, &fx_stb_r10, &fx_stb_r11
+	};
+	static void (*const classic_ldb[12]) (void) = {
+		&fx_ldb_r0, &fx_ldb_r1, &fx_ldb_r2, &fx_ldb_r3,
+		&fx_ldb_r4, &fx_ldb_r5, &fx_ldb_r6, &fx_ldb_r7,
+		&fx_ldb_r8, &fx_ldb_r9, &fx_ldb_r10, &fx_ldb_r11
+	};
+
+	int i;
+
+	if (GSU.bFx4)
+	{
+		// ALT1 $20/$2F: UDIV
+		static void (*const udivs[16]) (void) = {
+			&fx4_udiv_r0,  &fx4_udiv_r1,  &fx4_udiv_r2,  &fx4_udiv_r3,
+			&fx4_udiv_r4,  &fx4_udiv_r5,  &fx4_udiv_r6,  &fx4_udiv_r7,
+			&fx4_udiv_r8,  &fx4_udiv_r9,  &fx4_udiv_r10, &fx4_udiv_r11,
+			&fx4_udiv_r12, &fx4_udiv_r13, &fx4_udiv_r14, &fx4_udiv_r15
+		};
+		for (i = 0; i < 16; i++)
+			fx_OpcodeTable[0x120 + i] = udivs[i];
+
+		// ALT2 $20/$2F: DIV
+		static void (*const divs[16]) (void) = {
+			&fx4_div_r0,  &fx4_div_r1,  &fx4_div_r2,  &fx4_div_r3,
+			&fx4_div_r4,  &fx4_div_r5,  &fx4_div_r6,  &fx4_div_r7,
+			&fx4_div_r8,  &fx4_div_r9,  &fx4_div_r10, &fx4_div_r11,
+			&fx4_div_r12, &fx4_div_r13, &fx4_div_r14, &fx4_div_r15
+		};
+		for (i = 0; i < 16; i++)
+			fx_OpcodeTable[0x220 + i] = divs[i];
+
+		// ALT3 $20/$2F: MOD
+		static void (*const mods[16]) (void) = {
+			&fx4_mod_r0,  &fx4_mod_r1,  &fx4_mod_r2,  &fx4_mod_r3,
+			&fx4_mod_r4,  &fx4_mod_r5,  &fx4_mod_r6,  &fx4_mod_r7,
+			&fx4_mod_r8,  &fx4_mod_r9,  &fx4_mod_r10, &fx4_mod_r11,
+			&fx4_mod_r12, &fx4_mod_r13, &fx4_mod_r14, &fx4_mod_r15
+		};
+		for (i = 0; i < 16; i++)
+			fx_OpcodeTable[0x320 + i] = mods[i];
+
+		// ALT2 $30/$3B: WMULT
+		static void (*const wmults[12]) (void) = {
+			&fx4_wmult_r0, &fx4_wmult_r1, &fx4_wmult_r2, &fx4_wmult_r3,
+			&fx4_wmult_r4, &fx4_wmult_r5, &fx4_wmult_r6, &fx4_wmult_r7,
+			&fx4_wmult_r8, &fx4_wmult_r9, &fx4_wmult_r10, &fx4_wmult_r11
+		};
+		for (i = 0; i < 12; i++)
+			fx_OpcodeTable[0x230 + i] = wmults[i];
+
+		// ALT2 $40/$4B: FPMULT
+		static void (*const fpmults[12]) (void) = {
+			&fx4_fpmult_r0, &fx4_fpmult_r1, &fx4_fpmult_r2, &fx4_fpmult_r3,
+			&fx4_fpmult_r4, &fx4_fpmult_r5, &fx4_fpmult_r6, &fx4_fpmult_r7,
+			&fx4_fpmult_r8, &fx4_fpmult_r9, &fx4_fpmult_r10, &fx4_fpmult_r11
+		};
+		for (i = 0; i < 12; i++)
+			fx_OpcodeTable[0x240 + i] = fpmults[i];
+
+		// ALT3 $30/$3B: USTW
+		static void (*const ustws[12]) (void) = {
+			&fx4_ustw_r0, &fx4_ustw_r1, &fx4_ustw_r2, &fx4_ustw_r3,
+			&fx4_ustw_r4, &fx4_ustw_r5, &fx4_ustw_r6, &fx4_ustw_r7,
+			&fx4_ustw_r8, &fx4_ustw_r9, &fx4_ustw_r10, &fx4_ustw_r11
+		};
+		for (i = 0; i < 12; i++)
+			fx_OpcodeTable[0x330 + i] = ustws[i];
+
+		// ALT3 $40/$4B: ULDW
+		static void (*const uldws[12]) (void) = {
+			&fx4_uldw_r0, &fx4_uldw_r1, &fx4_uldw_r2, &fx4_uldw_r3,
+			&fx4_uldw_r4, &fx4_uldw_r5, &fx4_uldw_r6, &fx4_uldw_r7,
+			&fx4_uldw_r8, &fx4_uldw_r9, &fx4_uldw_r10, &fx4_uldw_r11
+		};
+		for (i = 0; i < 12; i++)
+			fx_OpcodeTable[0x340 + i] = uldws[i];
+
+		// ALT2 $98/$9D
+		fx_OpcodeTable[0x298] = &fx4_begindecomp;
+		fx_OpcodeTable[0x299] = &fx4_readcomp;
+		fx_OpcodeTable[0x29a] = &fx4_fx3cmd;
+		fx_OpcodeTable[0x29b] = &fx4_randseed;
+		fx_OpcodeTable[0x29c] = &fx4_rand;
+		fx_OpcodeTable[0x29d] = &fx4_memset;
+
+		// ALT3 $98/$9D
+		fx_OpcodeTable[0x398] = &fx4_lsr_imm;
+		fx_OpcodeTable[0x399] = &fx4_asr_imm;
+		fx_OpcodeTable[0x39a] = &fx4_asl_imm;
+		fx_OpcodeTable[0x39b] = &fx4_add_word;
+		fx_OpcodeTable[0x39c] = &fx4_adc_word;
+		fx_OpcodeTable[0x39d] = &fx4_wmult_word;
+	}
+	else
+	{
+		// Restore classic handlers in slots FX4 may have patched
+		for (i = 0; i < 16; i++)
+		{
+			fx_OpcodeTable[0x120 + i] = classic_with[i];
+			fx_OpcodeTable[0x220 + i] = classic_with[i];
+			fx_OpcodeTable[0x320 + i] = classic_with[i];
+		}
+		for (i = 0; i < 12; i++)
+		{
+			fx_OpcodeTable[0x230 + i] = classic_stw[i];
+			fx_OpcodeTable[0x240 + i] = classic_ldw[i];
+			fx_OpcodeTable[0x330 + i] = classic_stb[i];
+			fx_OpcodeTable[0x340 + i] = classic_ldb[i];
+		}
+		// ALT2 $98/$9D classic = JMP R8/R13
+		fx_OpcodeTable[0x298] = &fx_jmp_r8;
+		fx_OpcodeTable[0x299] = &fx_jmp_r9;
+		fx_OpcodeTable[0x29a] = &fx_jmp_r10;
+		fx_OpcodeTable[0x29b] = &fx_jmp_r11;
+		fx_OpcodeTable[0x29c] = &fx_jmp_r12;
+		fx_OpcodeTable[0x29d] = &fx_jmp_r13;
+		// ALT3 $98/$9D classic = LJMP R8/R13
+		fx_OpcodeTable[0x398] = &fx_ljmp_r8;
+		fx_OpcodeTable[0x399] = &fx_ljmp_r9;
+		fx_OpcodeTable[0x39a] = &fx_ljmp_r10;
+		fx_OpcodeTable[0x39b] = &fx_ljmp_r11;
+		fx_OpcodeTable[0x39c] = &fx_ljmp_r12;
+		fx_OpcodeTable[0x39d] = &fx_ljmp_r13;
+	}
 }
 
 // GSU executions functions

@@ -28,6 +28,7 @@
 
 #include "memmap.h"
 #include "apu/apu.h"
+#include "fxinst.h"
 #include "fxemu.h"
 #include "sdd1.h"
 #include "srtc.h"
@@ -1389,6 +1390,14 @@ bool8 CMemory::LoadROMInt (int32 ROMfillSize)
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x1A20 &&
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x1730 && // exclude Super FX 3
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x1830 &&
+		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAC20 && // exclude Super FX 4
+		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAC30 &&
+		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAD20 &&
+		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAD30 &&
+		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAE20 &&
+		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAE30 &&
+		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAF20 &&
+		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAF30 &&
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x3423 && // exclude SA-1
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x3523 &&
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x4332 && // exclude S-DD1
@@ -1842,10 +1851,11 @@ bool8 CMemory::SaveSRTC (void)
 void CMemory::ClearSRAM (bool8 onlyNonSavedSRAM)
 {
 	if (onlyNonSavedSRAM)
-		if (!(Settings.SuperFX && (ROMType < 0x15 || ROMType == 0x17)) && !(Settings.SA1 && ROMType == 0x34)) // can have SRAM
+		// SuperFX without battery: $13-$14 have, $15+ no; FX3 $17 no / $18 yes; FX4 $AC/$AE no, $AD/$AF yes
+	if (!(Settings.SuperFX && (ROMType < 0x15 || ROMType == 0x17 || ROMType == 0xAC || ROMType == 0xAE)) &&
+	    !(Settings.SA1 && ROMType == 0x34)) // can have SRAM
 			return;
-	// TODO: If SRAM size changes change this value as well
-	memset(SRAM, SNESGameFixes.SRAMInitialValue, 0x80000);
+	memset(SRAM, SNESGameFixes.SRAMInitialValue, SRAM_SIZE);
 }
 
 bool8 CMemory::LoadSRAM (const char *filename)
@@ -1870,7 +1880,9 @@ bool8 CMemory::LoadSRAM (const char *filename)
 	}
 
 	size = SRAMSize ? (1 << (SRAMSize + 3)) * 128 : 0;
-	if (LoROM)
+	if (SuperFX.isFx4)
+		size = size < (int) SRAM_SIZE ? size : (int) SRAM_SIZE;
+	else if (LoROM)
 		size = size < 0x70000 ? size : 0x70000;
 	else if (HiROM)
 		size = size < 0x40000 ? size : 0x40000;
@@ -1922,7 +1934,7 @@ bool8 CMemory::LoadSRAM (const char *filename)
 
 bool8 CMemory::SaveSRAM (const char *filename)
 {
-	if (Settings.SuperFX && (ROMType < 0x15 || ROMType == 0x17)) // doesn't have SRAM
+	if (Settings.SuperFX && (ROMType < 0x15 || ROMType == 0x17 || ROMType == 0xAC || ROMType == 0xAE)) // doesn't have SRAM
 		return (TRUE);
 
 	if (Settings.SA1 && ROMType == 0x34)    // doesn't have SRAM
@@ -1946,7 +1958,9 @@ bool8 CMemory::SaveSRAM (const char *filename)
     }
 
     size = SRAMSize ? (1 << (SRAMSize + 3)) * 128 : 0;
-	if (LoROM)
+	if (SuperFX.isFx4)
+		size = size < (int) SRAM_SIZE ? size : (int) SRAM_SIZE;
+	else if (LoROM)
 		size = size < 0x70000 ? size : 0x70000;
 	else if (HiROM)
 		size = size < 0x40000 ? size : 0x40000;
@@ -2055,6 +2069,8 @@ void CMemory::InitROM (void)
 {
 	Settings.SuperFX = FALSE;
 	SuperFX.isFx3 = FALSE;
+	SuperFX.isFx4 = FALSE;
+	SuperFX.hasSeparateGsuRom = FALSE;
 	Settings.DSP = 0;
 	Settings.SA1 = FALSE;
 	Settings.C4 = FALSE;
@@ -2185,12 +2201,26 @@ void CMemory::InitROM (void)
 			Settings.SA1 = TRUE;
 			break;
 
+		// Super FX 4 / GIGA-1 ($AC-$AF, Slow/Fast)
+		case 0xAC20:
+		case 0xAC30:
+		case 0xAD20:
+		case 0xAD30:
+		case 0xAE20:
+		case 0xAE30:
+		case 0xAF20:
+		case 0xAF30:
+			SuperFX.isFx4 = TRUE;
+			if (ROMType == 0xAE || ROMType == 0xAF)
+				SuperFX.hasSeparateGsuRom = TRUE;
+			// Fall through
 		// Super FX 3 (LRG, $18 = FX3+battery)
 		case 0x1720:
 		case 0x1730:
 		case 0x1820:
 		case 0x1830:
-			SuperFX.isFx3 = TRUE;
+			if (!SuperFX.isFx4)
+				SuperFX.isFx3 = TRUE;
 			// Fall through
 		// SuperFX
 		case 0x1320:
@@ -2207,7 +2237,21 @@ void CMemory::InitROM (void)
 			if (ROM[0x7FDA] == 0x33)
 				SRAMSize = ROM[0x7FBD];
 			else
-				SRAMSize = 5;
+				SRAMSize = SuperFX.isFx4 ? 7 : 5;
+			if (SuperFX.isFx4)
+			{
+				// GSU sees full SRAM (up to 16MB); SCPU only maps 384KB
+				uint32 sramBytes = SRAMSize ? (1u << (SRAMSize + 3)) * 128u : 0x10000;
+				if (sramBytes < 0x10000)
+					sramBytes = 0x10000;
+				if (sramBytes > (uint32) SRAM_SIZE)
+					sramBytes = (uint32) SRAM_SIZE;
+				SuperFX.nRamBanks = sramBytes >> 16;
+				if (SuperFX.nRamBanks < 1)
+					SuperFX.nRamBanks = 1;
+				if (SuperFX.nRamBanks > FX4_RAM_BANKS)
+					SuperFX.nRamBanks = FX4_RAM_BANKS;
+			}
 			break;
 
 		// SDD1
@@ -2279,7 +2323,9 @@ void CMemory::InitROM (void)
 			Map_SetaDSPLoROMMap();
 		else if (Settings.SuperFX)
 		{
-			if (SuperFX.isFx3)
+			if (SuperFX.isFx4)
+				Map_SuperFX4LoROMMap();
+			else if (SuperFX.isFx3)
 				Map_SuperFX3LoROMMap();
 			else
 				Map_SuperFXLoROMMap();
@@ -3001,6 +3047,44 @@ void CMemory::Map_SuperFX3LoROMMap (void)
 	map_WriteProtectROM();
 }
 
+// Super FX 4 / GIGA-1: 11.5MB SNES window, GSU MMIO at $3000-$3FFF,
+// SRAM at $78-$7D (384KB), $5000-$7FFF mirrors $78:0000.
+// No classic 32K SuperFX ROM mirror table (would clobber GSU ROM at 0xB80000).
+void CMemory::Map_SuperFX4LoROMMap (void)
+{
+	printf("Map_SuperFX4LoROMMap\n");
+	map_System();
+
+	// $00-$3F:$8000-$FFFF -> first 2MB
+	map_lorom(0x00, 0x3f, 0x8000, 0xffff, 0x200000);
+	// $80-$BF:$8000-$FFFF -> second 2MB
+	map_lorom_offset(0x80, 0xbf, 0x8000, 0xffff, 0x200000, 0x200000);
+	// $C0-$FF:$0000-$FFFF -> third 4MB (HiROM)
+	map_hirom_offset(0xc0, 0xff, 0x0000, 0xffff, 0x400000, 0x400000);
+	// $40-$77:$0000-$FFFF -> fourth 3.5MB (HiROM)
+	map_hirom_offset(0x40, 0x77, 0x0000, 0xffff, 0x380000, 0x800000);
+
+	// $78-$7D: SRAM (384KB exposed to SCPU; rest is GSU-only)
+	map_space(0x78, 0x78, 0x0000, 0xffff, SRAM);
+	map_space(0x79, 0x79, 0x0000, 0xffff, SRAM + 0x10000);
+	map_space(0x7a, 0x7a, 0x0000, 0xffff, SRAM + 0x20000);
+	map_space(0x7b, 0x7b, 0x0000, 0xffff, SRAM + 0x30000);
+	map_space(0x7c, 0x7c, 0x0000, 0xffff, SRAM + 0x40000);
+	map_space(0x7d, 0x7d, 0x0000, 0xffff, SRAM + 0x50000);
+
+	// $5000-$7FFF -> easy mirror of $78:0000 (12KB)
+	map_space(0x00, 0x3f, 0x5000, 0x7fff, SRAM - 0x5000);
+	map_space(0x80, 0xbf, 0x5000, 0x7fff, SRAM - 0x5000);
+
+	// GSU I/O $3000-$303F + cache $3040-$3FFF via PPU handlers
+	map_index(0x00, 0x3f, 0x3000, 0x3fff, MAP_PPU, MAP_TYPE_I_O);
+	map_index(0x80, 0xbf, 0x3000, 0x3fff, MAP_PPU, MAP_TYPE_I_O);
+
+	map_WRAM();
+
+	map_WriteProtectROM();
+}
+
 void CMemory::Map_SetaDSPLoROMMap (void)
 {
 	printf("Map_SetaDSPLoROMMap\n");
@@ -3374,7 +3458,7 @@ const char * CMemory::KartContents (void)
 	if (Settings.BS)
 		strcpy(chip, "+BS");
 	else if (Settings.SuperFX)
-		strcpy(chip, SuperFX.isFx3 ? "+Super FX 3" : "+Super FX");
+		strcpy(chip, SuperFX.isFx4 ? "+Super FX 4" : SuperFX.isFx3 ? "+Super FX 3" : "+Super FX");
 	else if (Settings.SDD1)
 		strcpy(chip, "+S-DD1");
 	else if (Settings.OBC1)

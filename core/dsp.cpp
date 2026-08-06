@@ -1,6 +1,6 @@
 /*****************************************************************************\
-     Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
-                This file is licensed under the Snes9x License.
+	 Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
+				This file is licensed under the Snes9x License.
    For further information, consult the LICENSE file in the root directory.
 \*****************************************************************************/
 
@@ -10,12 +10,10 @@
 #include "missing.h"
 #endif
 
-uint8	(*GetDSP) (uint16)        = NULL;
-void	(*SetDSP) (uint8, uint16) = NULL;
+uint8 (*GetDSP)(uint16) = NULL;
+void (*SetDSP)(uint8, uint16) = NULL;
 
-
-void S9xResetDSP (void)
-{
+void S9xResetDSP(void) {
 	memset(&DSP1, 0, sizeof(DSP1));
 	DSP1.waiting4command = TRUE;
 	DSP1.first_parameter = TRUE;
@@ -30,11 +28,9 @@ void S9xResetDSP (void)
 	DSP4.waiting4command = TRUE;
 }
 
-uint8 S9xGetDSP (uint16 address)
-{
+uint8 S9xGetDSP(uint16 address) {
 #ifdef DEBUGGER
-	if (Settings.TraceDSP)
-	{
+	if (Settings.TraceDSP) {
 		sprintf(String, "DSP read: 0x%04X", address);
 		S9xMessage(S9X_TRACE, S9X_TRACE_DSP1, String);
 	}
@@ -43,12 +39,10 @@ uint8 S9xGetDSP (uint16 address)
 	return ((*GetDSP)(address));
 }
 
-void S9xSetDSP (uint8 byte, uint16 address)
-{
+void S9xSetDSP(uint8 byte, uint16 address) {
 #ifdef DEBUGGER
 	missing.unknowndsp_write = address;
-	if (Settings.TraceDSP)
-	{
+	if (Settings.TraceDSP) {
 		sprintf(String, "DSP write: 0x%04X=0x%02X", address, byte);
 		S9xMessage(S9X_TRACE, S9X_TRACE_DSP1, String);
 	}

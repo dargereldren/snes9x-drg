@@ -4,24 +4,23 @@
 #include <string>
 #include <fstream>
 
-struct bml_node
-{
-    enum node_type {
-        CHILD,
-        ATTRIBUTE
-    };
+struct bml_node {
+	enum node_type {
+		CHILD,
+		ATTRIBUTE
+	};
 
-    bml_node();
-    bool parse_file(const std::string &filename);
-    void parse(std::ifstream &fd);
-    bml_node *find_subnode(const std::string &name);
-    void print();
+	bml_node();
+	bool parse_file(const std::string &filename);
+	void parse(std::ifstream &fd);
+	bml_node *find_subnode(const std::string &name);
+	void print();
 
-    std::string name;
-    std::string data;
-    int depth;
-    std::vector<bml_node> child;
-    node_type type;
+	std::string name;
+	std::string data;
+	int depth;
+	std::vector<bml_node> child;
+	node_type type;
 };
 
 #endif

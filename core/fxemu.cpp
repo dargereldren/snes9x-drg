@@ -1,6 +1,6 @@
 /*****************************************************************************\
-     Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
-                This file is licensed under the Snes9x License.
+	 Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
+				This file is licensed under the Snes9x License.
    For further information, consult the LICENSE file in the root directory.
 \*****************************************************************************/
 
@@ -9,131 +9,121 @@
 #include "fxinst.h"
 #include "fxemu.h"
 
-static void FxReset (struct FxInfo_s *);
-static void fx_readRegisterSpace (void);
-static void fx_writeRegisterSpace (void);
-static void fx_updateRamBank (uint8);
-static void fx_dirtySCBR (void);
-static bool8 fx_checkStartAddress (void);
-static uint32 FxEmulate (uint32);
-static void FxCacheWriteAccess (uint16);
-static void FxFlushCache (void);
+static void FxReset(struct FxInfo_s *);
+static void fx_readRegisterSpace(void);
+static void fx_writeRegisterSpace(void);
+static void fx_updateRamBank(uint8);
+static void fx_dirtySCBR(void);
+static bool8 fx_checkStartAddress(void);
+static uint32 FxEmulate(uint32);
+static void FxCacheWriteAccess(uint16);
+static void FxFlushCache(void);
 
-
-void S9xInitSuperFX (void)
-{
-	memset((uint8 *) &GSU, 0, sizeof(struct FxRegs_s));
+void S9xInitSuperFX(void) {
+	memset((uint8 *)&GSU, 0, sizeof(struct FxRegs_s));
 }
 
-void S9xResetSuperFX (void)
-{
+void S9xResetSuperFX(void) {
 	// FIXME: Snes9x only runs the SuperFX at the end of every line.
 	// 5823405 is a magic number that seems to work for most games.
-	SuperFX.speedPerLine = (uint32) (5823405 * ((1.0 / (float) Memory.ROMFramesPerSecond) / ((float) (Timings.V_Max))));
+	SuperFX.speedPerLine = (uint32)(5823405 * ((1.0 / (float)Memory.ROMFramesPerSecond) / ((float)(Timings.V_Max))));
 	SuperFX.oneLineDone = FALSE;
 	SuperFX.vFlags = 0;
 	CPU.IRQExternal = FALSE;
 	FxReset(&SuperFX);
 }
 
-void S9xSetSuperFX (uint8 byte, uint16 address)
-{
-	switch (address)
-	{
-		case 0x3030:
-			if ((Memory.FillRAM[0x3030] ^ byte) & FLG_G)
-			{
-				Memory.FillRAM[0x3030] = byte;
-				if (byte & FLG_G)
-				{
-					if (!SuperFX.oneLineDone)
-					{
-						S9xSuperFXExec();
-						SuperFX.oneLineDone = TRUE;
-					}
+void S9xSetSuperFX(uint8 byte, uint16 address) {
+	switch (address) {
+	case 0x3030:
+		if ((Memory.FillRAM[0x3030] ^ byte) & FLG_G) {
+			Memory.FillRAM[0x3030] = byte;
+			if (byte & FLG_G) {
+				if (!SuperFX.oneLineDone) {
+					S9xSuperFXExec();
+					SuperFX.oneLineDone = TRUE;
 				}
-				else
-					FxFlushCache();
+			} else {
+				FxFlushCache();
 			}
-			else
-				Memory.FillRAM[0x3030] = byte;
+		} else {
+			Memory.FillRAM[0x3030] = byte;
+		}
 
-			break;
+		break;
 
-		case 0x3031:
-			Memory.FillRAM[0x3031] = byte;
-			break;
+	case 0x3031:
+		Memory.FillRAM[0x3031] = byte;
+		break;
 
-		case 0x3033:
-			Memory.FillRAM[0x3033] = byte;
-			break;
+	case 0x3033:
+		Memory.FillRAM[0x3033] = byte;
+		break;
 
-		case 0x3034:
-			Memory.FillRAM[0x3034] = SuperFX.isFx4 ? byte : (byte & 0x7f);
-			break;
+	case 0x3034:
+		Memory.FillRAM[0x3034] = SuperFX.isFx4 ? byte : (byte & 0x7f);
+		break;
 
-		case 0x3036:
-			Memory.FillRAM[0x3036] = SuperFX.isFx4 ? byte : (byte & 0x7f);
-			break;
+	case 0x3036:
+		Memory.FillRAM[0x3036] = SuperFX.isFx4 ? byte : (byte & 0x7f);
+		break;
 
-		case 0x3037:
-			Memory.FillRAM[0x3037] = byte;
-			break;
+	case 0x3037:
+		Memory.FillRAM[0x3037] = byte;
+		break;
 
-		case 0x3038:
-			Memory.FillRAM[0x3038] = byte;
-			fx_dirtySCBR();
-			break;
+	case 0x3038:
+		Memory.FillRAM[0x3038] = byte;
+		fx_dirtySCBR();
+		break;
 
-		case 0x3039:
-			Memory.FillRAM[0x3039] = byte;
-			break;
+	case 0x3039:
+		Memory.FillRAM[0x3039] = byte;
+		break;
 
-		case 0x303a:
-			Memory.FillRAM[0x303a] = byte;
-			break;
+	case 0x303a:
+		Memory.FillRAM[0x303a] = byte;
+		break;
 
-		case 0x303b:
-			break;
+	case 0x303b:
+		break;
 
-		case 0x303c:
-			Memory.FillRAM[0x303c] = byte;
-			fx_updateRamBank(byte);
-			break;
+	case 0x303c:
+		Memory.FillRAM[0x303c] = byte;
+		fx_updateRamBank(byte);
+		break;
 
-		case 0x303f:
-			Memory.FillRAM[0x303f] = byte;
-			break;
+	case 0x303f:
+		Memory.FillRAM[0x303f] = byte;
+		break;
 
-		case 0x301f:
-			Memory.FillRAM[0x301f] = byte;
-			Memory.FillRAM[0x3000 + GSU_SFR] |= FLG_G;
-			if (!SuperFX.oneLineDone)
-			{
-				S9xSuperFXExec();
-				SuperFX.oneLineDone = TRUE;
-			}
+	case 0x301f:
+		Memory.FillRAM[0x301f] = byte;
+		Memory.FillRAM[0x3000 + GSU_SFR] |= FLG_G;
+		if (!SuperFX.oneLineDone) {
+			S9xSuperFXExec();
+			SuperFX.oneLineDone = TRUE;
+		}
 
-			break;
+		break;
 
-		default:
-			Memory.FillRAM[address] = byte;
-			if (SuperFX.isFx4 ? (address >= 0x3040 && address <= 0x3fff)
-			                 : (address >= 0x3100))
-				FxCacheWriteAccess(address);
+	default:
+		Memory.FillRAM[address] = byte;
+		if (SuperFX.isFx4 ? (address >= 0x3040 && address <= 0x3fff)
+						  : (address >= 0x3100)) {
+			FxCacheWriteAccess(address);
+		}
 
-			break;
+		break;
 	}
 }
 
-uint8 S9xGetSuperFX (uint16 address)
-{
-	uint8	byte;
+uint8 S9xGetSuperFX(uint16 address) {
+	uint8 byte;
 
 	byte = Memory.FillRAM[address];
 
-	if (address == 0x3031)
-	{
+	if (address == 0x3031) {
 		CPU.IRQExternal = FALSE;
 		Memory.FillRAM[0x3031] = byte & 0x7f;
 	}
@@ -141,56 +131,49 @@ uint8 S9xGetSuperFX (uint16 address)
 	return (byte);
 }
 
-void S9xSuperFXExec (void)
-{
+void S9xSuperFXExec(void) {
 	// FX3/FX4: the CPU keeps ROM/RAM access, so SCMR RON/RAN don't gate execution
 	if ((Memory.FillRAM[0x3000 + GSU_SFR] & FLG_G) &&
-	    (SuperFX.isFx3 || SuperFX.isFx4 || (Memory.FillRAM[0x3000 + GSU_SCMR] & 0x18) != 0))
-	{
+		(SuperFX.isFx3 || SuperFX.isFx4 || (Memory.FillRAM[0x3000 + GSU_SCMR] & 0x18) != 0)) {
 		int clockMul = (SuperFX.isFx3 || SuperFX.isFx4) ? 4 : 1;
 		FxEmulate(((Memory.FillRAM[0x3000 + GSU_CLSR] & 1) ? (SuperFX.speedPerLine * 5 / 2) : SuperFX.speedPerLine) * clockMul * Settings.SuperFXClockMultiplier / 100);
 
 		uint16 GSUStatus = Memory.FillRAM[0x3000 + GSU_SFR] | (Memory.FillRAM[0x3000 + GSU_SFR + 1] << 8);
-		if ((GSUStatus & (FLG_G | FLG_IRQ)) == FLG_IRQ)
+		if ((GSUStatus & (FLG_G | FLG_IRQ)) == FLG_IRQ) {
 			CPU.IRQExternal = TRUE;
+		}
 	}
 }
 
-static void FxReset (struct FxInfo_s *psFxInfo)
-{
+static void FxReset(struct FxInfo_s *psFxInfo) {
 	// Clear all internal variables
-	memset((uint8 *) &GSU, 0, sizeof(struct FxRegs_s));
+	memset((uint8 *)&GSU, 0, sizeof(struct FxRegs_s));
 
 	// Set default registers
 	GSU.pvSreg = GSU.pvDreg = &R0;
 
 	// Set RAM and ROM pointers
-	GSU.pvRegisters       = psFxInfo->pvRegisters;
-	GSU.nRamBanks         = psFxInfo->nRamBanks;
-	GSU.pvRam             = psFxInfo->pvRam;
-	GSU.nRomBanks         = psFxInfo->nRomBanks;
-	GSU.pvRom             = psFxInfo->pvRom;
-	GSU.bFx3              = psFxInfo->isFx3;
-	GSU.bFx4              = psFxInfo->isFx4;
-	GSU.bSeparateGsuRom   = psFxInfo->hasSeparateGsuRom;
+	GSU.pvRegisters = psFxInfo->pvRegisters;
+	GSU.nRamBanks = psFxInfo->nRamBanks;
+	GSU.pvRam = psFxInfo->pvRam;
+	GSU.nRomBanks = psFxInfo->nRomBanks;
+	GSU.pvRom = psFxInfo->pvRom;
+	GSU.bFx3 = psFxInfo->isFx3;
+	GSU.bFx4 = psFxInfo->isFx4;
+	GSU.bSeparateGsuRom = psFxInfo->hasSeparateGsuRom;
 	GSU.vPrevScreenHeight = ~0;
-	GSU.vPrevMode         = ~0;
+	GSU.vPrevMode = ~0;
 
-	if (GSU.bFx4)
-	{
+	if (GSU.bFx4) {
 		// FX4: linear 64KB ROM banks; optional private GSU ROM at +0xB80000
-		uint8	*gsuRom = GSU.pvRom;
-		uint32	gsuRomSize = Memory.CalculatedSize;
+		uint8 *gsuRom = GSU.pvRom;
+		uint32 gsuRomSize = Memory.CalculatedSize;
 
-		if (GSU.bSeparateGsuRom)
-		{
-			if (Memory.CalculatedSize > FX4_GSU_ROM_OFFSET)
-			{
+		if (GSU.bSeparateGsuRom) {
+			if (Memory.CalculatedSize > FX4_GSU_ROM_OFFSET) {
 				gsuRom = GSU.pvRom + FX4_GSU_ROM_OFFSET;
 				gsuRomSize = Memory.CalculatedSize - FX4_GSU_ROM_OFFSET;
-			}
-			else
-			{
+			} else {
 				// No extra payload: empty/open bus style (still point past cart)
 				gsuRom = GSU.pvRom + FX4_GSU_ROM_OFFSET;
 				gsuRomSize = 0;
@@ -200,43 +183,47 @@ static void FxReset (struct FxInfo_s *psFxInfo)
 		GSU.pvRom = gsuRom;
 		// nRomBanks as number of 64KB banks
 		GSU.nRomBanks = gsuRomSize ? ((gsuRomSize + 0xffff) >> 16) : 1;
-		if (GSU.nRomBanks < 1)
+		if (GSU.nRomBanks < 1) {
 			GSU.nRomBanks = 1;
-		if (GSU.nRomBanks > 256)
+		}
+		if (GSU.nRomBanks > 256) {
 			GSU.nRomBanks = 256;
+		}
 
-		if (GSU.nRamBanks < 1)
+		if (GSU.nRamBanks < 1) {
 			GSU.nRamBanks = 1;
-		if (GSU.nRamBanks > FX4_RAM_BANKS)
+		}
+		if (GSU.nRamBanks > FX4_RAM_BANKS) {
 			GSU.nRamBanks = FX4_RAM_BANKS;
+		}
 
 		// Clear register file + 4KB cache window ($3000/$3FFF)
 		memset(GSU.pvRegisters, 0, 0x1000);
 		GSU.pvRegisters[0x3b] = 0x54; // VCR
 
 		// Linear ROM banks $00/$FF
-		for (int i = 0; i < 256; i++)
-		{
-			uint32 b = (uint32) i % GSU.nRomBanks;
+		for (int i = 0; i < 256; i++) {
+			uint32 b = (uint32)i % GSU.nRomBanks;
 			GSU.apvRomBank[i] = &GSU.pvRom[b << 16];
 		}
 
 		// Linear RAM banks (full SRAM)
-		for (int i = 0; i < FX4_RAM_BANKS; i++)
-			GSU.apvRamBankFx4[i] = &GSU.pvRam[((uint32) i % GSU.nRamBanks) << 16];
+		for (int i = 0; i < FX4_RAM_BANKS; i++) {
+			GSU.apvRamBankFx4[i] = &GSU.pvRam[((uint32)i % GSU.nRamBanks) << 16];
+		}
 
 		// Keep classic 4-entry table in sync for any shared paths / snapshots
-		for (int i = 0; i < FX_RAM_BANKS; i++)
+		for (int i = 0; i < FX_RAM_BANKS; i++) {
 			GSU.apvRamBank[i] = GSU.apvRamBankFx4[i % GSU.nRamBanks];
+		}
 
 		GSU.pvCache = &GSU.pvRegisters[0x40]; // $3040
-	}
-	else
-	{
+	} else {
 		// The GSU can't access more than 2mb (16mbits); the FX3 sees 4mb
-		uint32	maxBanks = GSU.bFx3 ? 0x40 : 0x20;
-		if (GSU.nRomBanks > maxBanks)
+		uint32 maxBanks = GSU.bFx3 ? 0x40 : 0x20;
+		if (GSU.nRomBanks > maxBanks) {
 			GSU.nRomBanks = maxBanks;
+		}
 
 		// Clear FxChip register space
 		memset(GSU.pvRegisters, 0, 0x300);
@@ -245,29 +232,25 @@ static void FxReset (struct FxInfo_s *psFxInfo)
 		GSU.pvRegisters[0x3b] = GSU.bFx3 ? 0x52 : 0;
 
 		// Make ROM bank table (classic 32K mirrors for low banks)
-		for (int i = 0; i < 256; i++)
-		{
-			uint32	b = i & 0x7f;
+		for (int i = 0; i < 256; i++) {
+			uint32 b = i & 0x7f;
 
-			if (b >= 0x40)
-			{
-				if (GSU.nRomBanks > 1)
+			if (b >= 0x40) {
+				if (GSU.nRomBanks > 1) {
 					b %= GSU.nRomBanks;
-				else
+				} else {
 					b &= 1;
+				}
 
 				GSU.apvRomBank[i] = &GSU.pvRom[b << 16];
-			}
-			else
-			{
+			} else {
 				b %= GSU.nRomBanks * 2;
 				GSU.apvRomBank[i] = &GSU.pvRom[(b << 16) + FX_MEMORY_32K_MIRRORS];
 			}
 		}
 
 		// Make RAM bank table
-		for (int i = 0; i < 4; i++)
-		{
+		for (int i = 0; i < 4; i++) {
 			GSU.apvRamBank[i] = &GSU.pvRam[(i % GSU.nRamBanks) << 16];
 			GSU.apvRomBank[0x70 + i] = GSU.apvRamBank[i];
 		}
@@ -282,65 +265,67 @@ static void FxReset (struct FxInfo_s *psFxInfo)
 	fx_readRegisterSpace();
 }
 
-static void fx_readRegisterSpace (void)
-{
-	static const uint32	avHeight[] = { 128, 160, 192, 256 };
-	static const uint32	avMult[]   = {  16,  32,  32,  64 };
+static void fx_readRegisterSpace(void) {
+	static const uint32 avHeight[] = {128, 160, 192, 256};
+	static const uint32 avMult[] = {16, 32, 32, 64};
 
-	uint8	*p;
-	int		n;
+	uint8 *p;
+	int n;
 
 	GSU.vErrorCode = 0;
 
 	// Update R0-R15
 	p = GSU.pvRegisters;
-	for (int i = 0; i < 16; i++, p += 2)
-		GSU.avReg[i] = (uint32) READ_WORD(p);
+	for (int i = 0; i < 16; i++, p += 2) {
+		GSU.avReg[i] = (uint32)READ_WORD(p);
+	}
 
 	// Update other registers
 	p = GSU.pvRegisters;
-	GSU.vStatusReg     =  (uint32) READ_WORD(&p[GSU_SFR]);
-	GSU.vPrgBankReg    =  (uint32) p[GSU_PBR];
-	GSU.vRomBankReg    =  (uint32) p[GSU_ROMBR];
-	GSU.vRamBankReg    = GSU.bFx4 ? (uint32) p[GSU_RAMBR]
-	                             : ((uint32) p[GSU_RAMBR]) & (FX_RAM_BANKS - 1);
-	GSU.vCacheBaseReg  =  (uint32) p[GSU_CBR];
-	GSU.vCacheBaseReg |= ((uint32) p[GSU_CBR + 1]) << 8;
+	GSU.vStatusReg = (uint32)READ_WORD(&p[GSU_SFR]);
+	GSU.vPrgBankReg = (uint32)p[GSU_PBR];
+	GSU.vRomBankReg = (uint32)p[GSU_ROMBR];
+	GSU.vRamBankReg = GSU.bFx4 ? (uint32)p[GSU_RAMBR]
+							   : ((uint32)p[GSU_RAMBR]) & (FX_RAM_BANKS - 1);
+	GSU.vCacheBaseReg = (uint32)p[GSU_CBR];
+	GSU.vCacheBaseReg |= ((uint32)p[GSU_CBR + 1]) << 8;
 
 	// Update status register variables
-	GSU.vZero     = !(GSU.vStatusReg & FLG_Z);
-	GSU.vSign     =  (GSU.vStatusReg & FLG_S)  << 12;
-	GSU.vOverflow =  (GSU.vStatusReg & FLG_OV) << 16;
-	GSU.vCarry    =  (GSU.vStatusReg & FLG_CY) >> 2;
+	GSU.vZero = !(GSU.vStatusReg & FLG_Z);
+	GSU.vSign = (GSU.vStatusReg & FLG_S) << 12;
+	GSU.vOverflow = (GSU.vStatusReg & FLG_OV) << 16;
+	GSU.vCarry = (GSU.vStatusReg & FLG_CY) >> 2;
 
 	// Set bank pointers
-	if (GSU.bFx4)
-	{
+	if (GSU.bFx4) {
 		GSU.vRamBankReg &= 0xff;
 		GSU.pvRamBank = GSU.apvRamBankFx4[GSU.vRamBankReg % (GSU.nRamBanks ? GSU.nRamBanks : 1)];
-	}
-	else
+	} else {
 		GSU.pvRamBank = GSU.apvRamBank[GSU.vRamBankReg & 0x3];
+	}
 	GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg & 0xff];
 	GSU.pvPrgBank = GSU.apvRomBank[GSU.vPrgBankReg & 0xff];
 
 	// Set screen pointers
 	GSU.pvScreenBase = &GSU.pvRam[USEX8(p[GSU_SCBR]) << 10];
-	n  =  (int) (!!(p[GSU_SCMR] & 0x04));
-	n |= ((int) (!!(p[GSU_SCMR] & 0x20))) << 1;
+	n = (int)(!!(p[GSU_SCMR] & 0x04));
+	n |= ((int)(!!(p[GSU_SCMR] & 0x20))) << 1;
 	GSU.vScreenHeight = GSU.vScreenRealHeight = avHeight[n];
 	GSU.vMode = p[GSU_SCMR] & 0x03;
 
-	if (n == 3)
+	if (n == 3) {
 		GSU.vScreenSize = (256 / 8) * (256 / 8) * 32;
-	else
+	} else {
 		GSU.vScreenSize = (GSU.vScreenHeight / 8) * (256 / 8) * avMult[GSU.vMode];
+	}
 
-	if (GSU.vPlotOptionReg & 0x10) // OBJ Mode (for drawing into sprites)
+	if (GSU.vPlotOptionReg & 0x10) { // OBJ Mode (for drawing into sprites)
 		GSU.vScreenHeight = 256;
+	}
 
-	if (GSU.pvScreenBase + GSU.vScreenSize > GSU.pvRam + (GSU.nRamBanks * 65536))
+	if (GSU.pvScreenBase + GSU.vScreenSize > GSU.pvRam + (GSU.nRamBanks * 65536)) {
 		GSU.pvScreenBase = GSU.pvRam + (GSU.nRamBanks * 65536) - GSU.vScreenSize;
+	}
 
 	GSU.pfPlot = fx_PlotTable[GSU.vMode];
 	GSU.pfRpix = fx_PlotTable[GSU.vMode + 5];
@@ -352,108 +337,108 @@ static void fx_readRegisterSpace (void)
 
 	fx_computeScreenPointers();
 
-	//fx_backupCache();
+	// fx_backupCache();
 }
 
-static void fx_writeRegisterSpace (void)
-{
-	uint8	*p;
+static void fx_writeRegisterSpace(void) {
+	uint8 *p;
 
 	p = GSU.pvRegisters;
-	for (int i = 0; i < 16; i++, p += 2)
+	for (int i = 0; i < 16; i++, p += 2) {
 		WRITE_WORD(p, GSU.avReg[i]);
+	}
 
 	// Update status register
-	if (USEX16(GSU.vZero) == 0)
+	if (USEX16(GSU.vZero) == 0) {
 		SF(Z);
-	else
+	} else {
 		CF(Z);
+	}
 
-	if (GSU.vSign & 0x8000)
+	if (GSU.vSign & 0x8000) {
 		SF(S);
-	else
+	} else {
 		CF(S);
+	}
 
-	if (GSU.vOverflow >= 0x8000 || GSU.vOverflow < -0x8000)
+	if (GSU.vOverflow >= 0x8000 || GSU.vOverflow < -0x8000) {
 		SF(OV);
-	else
+	} else {
 		CF(OV);
+	}
 
-	if (GSU.vCarry)
+	if (GSU.vCarry) {
 		SF(CY);
-	else
+	} else {
 		CF(CY);
+	}
 
 	p = GSU.pvRegisters;
 	WRITE_WORD(&p[GSU_SFR], GSU.vStatusReg);
-	p[GSU_PBR]     = (uint8)  GSU.vPrgBankReg;
-	p[GSU_ROMBR]   = (uint8)  GSU.vRomBankReg;
-	p[GSU_RAMBR]   = (uint8)  GSU.vRamBankReg;
+	p[GSU_PBR] = (uint8)GSU.vPrgBankReg;
+	p[GSU_ROMBR] = (uint8)GSU.vRomBankReg;
+	p[GSU_RAMBR] = (uint8)GSU.vRamBankReg;
 	WRITE_WORD(&p[GSU_CBR], GSU.vCacheBaseReg);
 
-	//fx_restoreCache();
+	// fx_restoreCache();
 }
 
 // Update RamBankReg and RAM Bank pointer
-static void fx_updateRamBank (uint8 byte)
-{
-	if (GSU.bFx4)
-	{
-		GSU.vRamBankReg = (uint32) byte;
+static void fx_updateRamBank(uint8 byte) {
+	if (GSU.bFx4) {
+		GSU.vRamBankReg = (uint32)byte;
 		GSU.pvRamBank = GSU.apvRamBankFx4[byte % (GSU.nRamBanks ? GSU.nRamBanks : 1)];
-	}
-	else
-	{
-		GSU.vRamBankReg = (uint32) byte & (FX_RAM_BANKS - 1);
+	} else {
+		GSU.vRamBankReg = (uint32)byte & (FX_RAM_BANKS - 1);
 		GSU.pvRamBank = GSU.apvRamBank[byte & 0x3];
 	}
 }
 
 // SCBR write seen. We need to update our cached screen pointers
-static void fx_dirtySCBR (void)
-{
+static void fx_dirtySCBR(void) {
 	GSU.vSCBRDirty = TRUE;
 }
 
-static bool8 fx_checkStartAddress (void)
-{
+static bool8 fx_checkStartAddress(void) {
 	uint32 cacheSize = GSU.bFx4 ? FX4_CACHE_SIZE : 512;
 
 	// Check if we start inside the cache
-	if (GSU.bCacheActive && R15 >= GSU.vCacheBaseReg && R15 < (GSU.vCacheBaseReg + cacheSize))
+	if (GSU.bCacheActive && R15 >= GSU.vCacheBaseReg && R15 < (GSU.vCacheBaseReg + cacheSize)) {
 		return true;
-
-	// FX4: no bus arbitration; full linear ROM space
-	if (GSU.bFx4)
-		return true;
-
-	// FX3: no bus arbitration, any ROM (<= 0x6f) or RAM (0x70-0x71) bank runs
-	if (GSU.bFx3)
-		return (GSU.vPrgBankReg <= 0x71);
-
-	if (SCMR & (1 << 4))
-	{
-		if (GSU.vPrgBankReg <= 0x5f || GSU.vPrgBankReg >= 0x80)
-			return true;
 	}
 
-	if (GSU.vPrgBankReg <= 0x7f && (SCMR & (1 << 3)))
+	// FX4: no bus arbitration; full linear ROM space
+	if (GSU.bFx4) {
 		return true;
+	}
+
+	// FX3: no bus arbitration, any ROM (<= 0x6f) or RAM (0x70-0x71) bank runs
+	if (GSU.bFx3) {
+		return (GSU.vPrgBankReg <= 0x71);
+	}
+
+	if (SCMR & (1 << 4)) {
+		if (GSU.vPrgBankReg <= 0x5f || GSU.vPrgBankReg >= 0x80) {
+			return true;
+		}
+	}
+
+	if (GSU.vPrgBankReg <= 0x7f && (SCMR & (1 << 3))) {
+		return true;
+	}
 
 	return false;
 }
 
 // Execute until the next stop instruction
-static uint32 FxEmulate (uint32 nInstructions)
-{
-	uint32	vCount;
+static uint32 FxEmulate(uint32 nInstructions) {
+	uint32 vCount;
 
 	// Read registers and initialize GSU session
 	fx_readRegisterSpace();
 
 	// Check if the start address is valid
-	if (!fx_checkStartAddress())
-	{
+	if (!fx_checkStartAddress()) {
 		CF(G);
 		fx_writeRegisterSpace();
 		/*
@@ -478,156 +463,138 @@ static uint32 FxEmulate (uint32 nInstructions)
 	fx_writeRegisterSpace();
 
 	// Check for error code
-	if (GSU.vErrorCode)
+	if (GSU.vErrorCode) {
 		return (GSU.vErrorCode);
-	else
+	} else {
 		return (vCount);
+	}
 }
 
-void fx_computeScreenPointers (void)
-{
-	if (GSU.vMode != GSU.vPrevMode || GSU.vPrevScreenHeight != GSU.vScreenHeight || GSU.vSCBRDirty)
-	{
+void fx_computeScreenPointers(void) {
+	if (GSU.vMode != GSU.vPrevMode || GSU.vPrevScreenHeight != GSU.vScreenHeight || GSU.vSCBRDirty) {
 		GSU.vSCBRDirty = FALSE;
 
 		// Make a list of pointers to the start of each screen column
-		switch (GSU.vScreenHeight)
-		{
-			case 128:
-				switch (GSU.vMode)
-				{
-					case 0:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 4);
-							GSU.x[i] = i <<  8;
-						}
-
-						break;
-
-					case 1:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 5);
-							GSU.x[i] = i <<  9;
-						}
-
-						break;
-
-					case 2:
-					case 3:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 6);
-							GSU.x[i] = i << 10;
-						}
-
-						break;
+		switch (GSU.vScreenHeight) {
+		case 128:
+			switch (GSU.vMode) {
+			case 0:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 4);
+					GSU.x[i] = i << 8;
 				}
 
 				break;
 
-			case 160:
-				switch (GSU.vMode)
-				{
-					case 0:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 4);
-							GSU.x[i] = (i <<  8) + (i << 6);
-						}
-
-						break;
-
-					case 1:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 5);
-							GSU.x[i] = (i <<  9) + (i << 7);
-						}
-
-						break;
-
-					case 2:
-					case 3:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 6);
-							GSU.x[i] = (i << 10) + (i << 8);
-						}
-
-						break;
+			case 1:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 5);
+					GSU.x[i] = i << 9;
 				}
 
 				break;
 
-			case 192:
-				switch (GSU.vMode)
-				{
-					case 0:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 4);
-							GSU.x[i] = (i <<  8) + (i << 7);
-						}
+			case 2:
+			case 3:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 6);
+					GSU.x[i] = i << 10;
+				}
 
-						break;
+				break;
+			}
 
-					case 1:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 5);
-							GSU.x[i] = (i <<  9) + (i << 8);
-						}
+			break;
 
-						break;
-
-					case 2:
-					case 3:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + (i << 6);
-							GSU.x[i] = (i << 10) + (i << 9);
-						}
-
-						break;
+		case 160:
+			switch (GSU.vMode) {
+			case 0:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 4);
+					GSU.x[i] = (i << 8) + (i << 6);
 				}
 
 				break;
 
-			case 256:
-				switch (GSU.vMode)
-				{
-					case 0:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + ((i & 0x10) <<  9) + ((i & 0xf) <<  8);
-							GSU.x[i] = ((i & 0x10) <<  8) + ((i & 0xf) << 4);
-						}
-
-						break;
-
-					case 1:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + ((i & 0x10) << 10) + ((i & 0xf) <<  9);
-							GSU.x[i] = ((i & 0x10) <<  9) + ((i & 0xf) << 5);
-						}
-
-						break;
-
-					case 2:
-					case 3:
-						for (int i = 0; i < 32; i++)
-						{
-							GSU.apvScreen[i] = GSU.pvScreenBase + ((i & 0x10) << 11) + ((i & 0xf) << 10);
-							GSU.x[i] = ((i & 0x10) << 10) + ((i & 0xf) << 6);
-						}
-
-						break;
+			case 1:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 5);
+					GSU.x[i] = (i << 9) + (i << 7);
 				}
 
 				break;
+
+			case 2:
+			case 3:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 6);
+					GSU.x[i] = (i << 10) + (i << 8);
+				}
+
+				break;
+			}
+
+			break;
+
+		case 192:
+			switch (GSU.vMode) {
+			case 0:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 4);
+					GSU.x[i] = (i << 8) + (i << 7);
+				}
+
+				break;
+
+			case 1:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 5);
+					GSU.x[i] = (i << 9) + (i << 8);
+				}
+
+				break;
+
+			case 2:
+			case 3:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + (i << 6);
+					GSU.x[i] = (i << 10) + (i << 9);
+				}
+
+				break;
+			}
+
+			break;
+
+		case 256:
+			switch (GSU.vMode) {
+			case 0:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + ((i & 0x10) << 9) + ((i & 0xf) << 8);
+					GSU.x[i] = ((i & 0x10) << 8) + ((i & 0xf) << 4);
+				}
+
+				break;
+
+			case 1:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + ((i & 0x10) << 10) + ((i & 0xf) << 9);
+					GSU.x[i] = ((i & 0x10) << 9) + ((i & 0xf) << 5);
+				}
+
+				break;
+
+			case 2:
+			case 3:
+				for (int i = 0; i < 32; i++) {
+					GSU.apvScreen[i] = GSU.pvScreenBase + ((i & 0x10) << 11) + ((i & 0xf) << 10);
+					GSU.x[i] = ((i & 0x10) << 10) + ((i & 0xf) << 6);
+				}
+
+				break;
+			}
+
+			break;
 		}
 
 		GSU.vPrevMode = GSU.vMode;
@@ -636,8 +603,7 @@ void fx_computeScreenPointers (void)
 }
 
 // Write access to the cache
-static void FxCacheWriteAccess (uint16 vAddress)
-{
+static void FxCacheWriteAccess(uint16 vAddress) {
 	/*
 	if (!GSU.bCacheActive)
 	{
@@ -647,21 +613,20 @@ static void FxCacheWriteAccess (uint16 vAddress)
 	}
 	*/
 
-	if ((vAddress & 0x00f) == 0x00f)
+	if ((vAddress & 0x00f) == 0x00f) {
 		GSU.vCacheFlags |= 1 << ((vAddress & 0x1f0) >> 4);
+	}
 }
 
-static void FxFlushCache (void)
-{
+static void FxFlushCache(void) {
 	GSU.vCacheFlags = 0;
 	GSU.vCacheBaseReg = 0;
 	GSU.bCacheActive = FALSE;
-	//GSU.vPipe = 0x1;
+	// GSU.vPipe = 0x1;
 }
 
-void fx_flushCache (void)
-{
-	//fx_restoreCache();
+void fx_flushCache(void) {
+	// fx_restoreCache();
 	GSU.vCacheFlags = 0;
 	GSU.bCacheActive = FALSE;
 }

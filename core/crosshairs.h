@@ -1,6 +1,6 @@
 /*****************************************************************************\
-     Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
-                This file is licensed under the Snes9x License.
+	 Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
+				This file is licensed under the Snes9x License.
    For further information, consult the LICENSE file in the root directory.
 \*****************************************************************************/
 
@@ -9,17 +9,17 @@
 
 // Read in the specified crosshair file, replacing whatever data might be in that slot.
 // Available slots are 1-31.
-// The input file must be a PNG or a text file. 
+// The input file must be a PNG or a text file.
 // PNG:  15x15 pixels, palettized, with 3 colors (white, black, and transparent).
 // text: 15 lines of 16 characters (counting the \n), consisting of ' ', '#', or '.'.
 
-bool S9xLoadCrosshairFile (int idx, const char *filename);
+bool S9xLoadCrosshairFile(int idx, const char *filename);
 
 // Return the specified crosshair. Woo-hoo.
 // char * to a 225-byte string, with '#' marking foreground, '.' marking background,
 // and anything else transparent.
 
-const char * S9xGetCrosshair (int idx);
+const char *S9xGetCrosshair(int idx);
 
 // In controls.cpp. Sets the crosshair for the specified device. Defaults are:
 //                cross   fgcolor    bgcolor
@@ -35,8 +35,7 @@ const char * S9xGetCrosshair (int idx);
 // You may also prefix a 't' (e.g. tBlue) for a 50%-transparent version.
 // Use idx = -1 or fg/bg = NULL to keep the current setting.
 
-enum crosscontrols
-{
+enum crosscontrols {
 	X_MOUSE1,
 	X_MOUSE2,
 	X_SUPERSCOPE,
@@ -45,8 +44,8 @@ enum crosscontrols
 	X_MACSRIFLE
 };
 
-void S9xSetControllerCrosshair (enum crosscontrols ctl, int8 idx, const char *fg, const char *bg);
-void S9xGetControllerCrosshair (enum crosscontrols ctl, int8 *idx, const char **fg, const char **bg);
+void S9xSetControllerCrosshair(enum crosscontrols ctl, int8 idx, const char *fg, const char *bg);
+void S9xGetControllerCrosshair(enum crosscontrols ctl, int8 *idx, const char **fg, const char **bg);
 
 // In gfx.cpp, much like S9xDisplayChar() except it takes the parameters
 // listed and looks up GFX.Screen.
@@ -59,6 +58,6 @@ void S9xGetControllerCrosshair (enum crosscontrols ctl, int8 *idx, const char **
 //  3 = 16 16 16     7 = 31 16  0   11 =  0 23 31   15 = 31  0 16
 //  16-31 are 50% transparent versions of 0-15.
 
-void S9xDrawCrosshair (const char *crosshair, uint8 fgcolor, uint8 bgcolor, int16 x, int16 y);
+void S9xDrawCrosshair(const char *crosshair, uint8 fgcolor, uint8 bgcolor, int16 x, int16 y);
 
 #endif

@@ -1,6 +1,6 @@
 /*****************************************************************************\
-     Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
-                This file is licensed under the Snes9x License.
+	 Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
+				This file is licensed under the Snes9x License.
    For further information, consult the LICENSE file in the root directory.
 \*****************************************************************************/
 
@@ -27,7 +27,7 @@
 #endif
 
 #ifdef __WIN32__
-//#define RIGHTSHIFT_IS_SAR
+// #define RIGHTSHIFT_IS_SAR
 #define RIGHTSHIFT_int8_IS_SAR
 #define RIGHTSHIFT_int16_IS_SAR
 #define RIGHTSHIFT_int32_IS_SAR
@@ -45,107 +45,107 @@
 #endif
 
 #if defined(__GNUC__)
-#define alwaysinline  inline __attribute__((always_inline))
+#define alwaysinline inline __attribute__((always_inline))
 #elif defined(_MSC_VER)
-#define alwaysinline  __forceinline
+#define alwaysinline __forceinline
 #else
-#define alwaysinline  inline
+#define alwaysinline inline
 #endif
 
 #ifndef snes9x_types_defined
 #define snes9x_types_defined
-typedef unsigned char		bool8;
+typedef unsigned char bool8;
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
-typedef intptr_t			pint;
-typedef int8_t				int8;
-typedef uint8_t				uint8;
-typedef int16_t				int16;
-typedef uint16_t			uint16;
-typedef int32_t				int32;
-typedef uint32_t			uint32;
-typedef int64_t				int64;
-typedef uint64_t			uint64;
-#else	// HAVE_STDINT_H
+typedef intptr_t pint;
+typedef int8_t int8;
+typedef uint8_t uint8;
+typedef int16_t int16;
+typedef uint16_t uint16;
+typedef int32_t int32;
+typedef uint32_t uint32;
+typedef int64_t int64;
+typedef uint64_t uint64;
+#else // HAVE_STDINT_H
 #ifdef __WIN32__
-typedef intptr_t			pint;
-typedef signed char			int8;
-typedef unsigned char		uint8;
-typedef signed short		int16;
-typedef unsigned short		uint16;
-typedef signed int     		int32;
-typedef unsigned int		uint32;
-typedef signed __int64		int64;
-typedef unsigned __int64	uint64;
-typedef int8                int8_t;
-typedef uint8       		uint8_t;
-typedef int16       		int16_t;
-typedef uint16      		uint16_t;
-typedef int32		    	int32_t;
-typedef uint32      		uint32_t;
-typedef int64               int64_t;
-typedef uint64              uint64_t;
-typedef int					socklen_t;
-#else	// __WIN32__
-typedef signed char			int8;
-typedef unsigned char		uint8;
-typedef signed short		int16;
-typedef unsigned short		uint16;
-typedef signed int			int32;
-typedef unsigned int		uint32;
+typedef intptr_t pint;
+typedef signed char int8;
+typedef unsigned char uint8;
+typedef signed short int16;
+typedef unsigned short uint16;
+typedef signed int int32;
+typedef unsigned int uint32;
+typedef signed __int64 int64;
+typedef unsigned __int64 uint64;
+typedef int8 int8_t;
+typedef uint8 uint8_t;
+typedef int16 int16_t;
+typedef uint16 uint16_t;
+typedef int32 int32_t;
+typedef uint32 uint32_t;
+typedef int64 int64_t;
+typedef uint64 uint64_t;
+typedef int socklen_t;
+#else // __WIN32__
+typedef signed char int8;
+typedef unsigned char uint8;
+typedef signed short int16;
+typedef unsigned short uint16;
+typedef signed int int32;
+typedef unsigned int uint32;
 #ifdef __GNUC__
-// long long is not part of ISO C++ 
+// long long is not part of ISO C++
 __extension__
 #endif
-typedef long long			int64;
-typedef unsigned long long	uint64;
-typedef size_t				pint;
-#endif	//  __WIN32__
-#endif	// HAVE_STDINT_H
-#endif	// snes9x_types_defined
+	typedef long long int64;
+typedef unsigned long long uint64;
+typedef size_t pint;
+#endif //  __WIN32__
+#endif // HAVE_STDINT_H
+#endif // snes9x_types_defined
 
 #ifndef TRUE
-#define TRUE	1
+#define TRUE 1
 #endif
 #ifndef FALSE
-#define FALSE	0
+#define FALSE 0
 #endif
 
 #ifndef __WIN32__
 #ifndef PATH_MAX
-#define PATH_MAX        1024
+#define PATH_MAX 1024
 #endif
 #else
 #ifndef PATH_MAX
-#define PATH_MAX        _MAX_PATH
+#define PATH_MAX _MAX_PATH
 #endif
 #endif
 
 #include "fscompat.h"
 
-#define S9xDisplayString	DisplayStringFromBottom
+#define S9xDisplayString DisplayStringFromBottom
 #ifdef __WIN32__
 #if !defined(SNES9X_QT) && !defined(__LIBRETRO__)
 void SetInfoDlgColor(unsigned char, unsigned char, unsigned char);
-#define SET_UI_COLOR(r,g,b) SetInfoDlgColor(r,g,b)
+#define SET_UI_COLOR(r, g, b) SetInfoDlgColor(r, g, b)
 #endif
 #ifndef snprintf
-   #define snprintf _snprintf
+#define snprintf _snprintf
 #endif
 #ifndef strcasecmp
-   #define strcasecmp	stricmp
+#define strcasecmp stricmp
 #endif
 #ifndef strncasecmp
-   #define strncasecmp	strnicmp
+#define strncasecmp strnicmp
 #endif
-#endif  // __WIN32__
+#endif // __WIN32__
 
 #if defined(__DJGPP) || defined(__WIN32__)
-#define SLASH_STR	"\\"
-#define SLASH_CHAR	'\\'
+#define SLASH_STR "\\"
+#define SLASH_CHAR '\\'
 #else
-#define SLASH_STR	"/"
-#define SLASH_CHAR	'/'
+#define SLASH_STR "/"
+#define SLASH_CHAR '/'
 #endif
 
 #ifndef TITLE
@@ -160,23 +160,23 @@ void SetInfoDlgColor(unsigned char, unsigned char, unsigned char);
 #endif
 
 #ifdef FAST_LSB_WORD_ACCESS
-#define READ_WORD(s)		(*(uint16 *) (s))
-#define READ_3WORD(s)		(*(uint32 *) (s) & 0x00ffffff)
-#define READ_DWORD(s)		(*(uint32 *) (s))
-#define WRITE_WORD(s, d)	*(uint16 *) (s) = (d)
-#define WRITE_3WORD(s, d)	*(uint16 *) (s) = (uint16) (d), *((uint8 *) (s) + 2) = (uint8) ((d) >> 16)
-#define WRITE_DWORD(s, d)	*(uint32 *) (s) = (d)
+#define READ_WORD(s) (*(uint16 *)(s))
+#define READ_3WORD(s) (*(uint32 *)(s)&0x00ffffff)
+#define READ_DWORD(s) (*(uint32 *)(s))
+#define WRITE_WORD(s, d) *(uint16 *)(s) = (d)
+#define WRITE_3WORD(s, d) *(uint16 *)(s) = (uint16)(d), *((uint8 *)(s) + 2) = (uint8)((d) >> 16)
+#define WRITE_DWORD(s, d) *(uint32 *)(s) = (d)
 #else
-#define READ_WORD(s)		(*(uint8 *) (s) | (*((uint8 *) (s) + 1) << 8))
-#define READ_3WORD(s)		(*(uint8 *) (s) | (*((uint8 *) (s) + 1) << 8) | (*((uint8 *) (s) + 2) << 16))
-#define READ_DWORD(s)		(*(uint8 *) (s) | (*((uint8 *) (s) + 1) << 8) | (*((uint8 *) (s) + 2) << 16) | (*((uint8 *) (s) + 3) << 24))
-#define WRITE_WORD(s, d)	*(uint8 *) (s) = (uint8) (d), *((uint8 *) (s) + 1) = (uint8) ((d) >> 8)
-#define WRITE_3WORD(s, d)	*(uint8 *) (s) = (uint8) (d), *((uint8 *) (s) + 1) = (uint8) ((d) >> 8), *((uint8 *) (s) + 2) = (uint8) ((d) >> 16)
-#define WRITE_DWORD(s, d)	*(uint8 *) (s) = (uint8) (d), *((uint8 *) (s) + 1) = (uint8) ((d) >> 8), *((uint8 *) (s) + 2) = (uint8) ((d) >> 16), *((uint8 *) (s) + 3) = (uint8) ((d) >> 24)
+#define READ_WORD(s) (*(uint8 *)(s) | (*((uint8 *)(s) + 1) << 8))
+#define READ_3WORD(s) (*(uint8 *)(s) | (*((uint8 *)(s) + 1) << 8) | (*((uint8 *)(s) + 2) << 16))
+#define READ_DWORD(s) (*(uint8 *)(s) | (*((uint8 *)(s) + 1) << 8) | (*((uint8 *)(s) + 2) << 16) | (*((uint8 *)(s) + 3) << 24))
+#define WRITE_WORD(s, d) *(uint8 *)(s) = (uint8)(d), *((uint8 *)(s) + 1) = (uint8)((d) >> 8)
+#define WRITE_3WORD(s, d) *(uint8 *)(s) = (uint8)(d), *((uint8 *)(s) + 1) = (uint8)((d) >> 8), *((uint8 *)(s) + 2) = (uint8)((d) >> 16)
+#define WRITE_DWORD(s, d) *(uint8 *)(s) = (uint8)(d), *((uint8 *)(s) + 1) = (uint8)((d) >> 8), *((uint8 *)(s) + 2) = (uint8)((d) >> 16), *((uint8 *)(s) + 3) = (uint8)((d) >> 24)
 #endif
 
-#define SWAP_WORD(s)		(s) = (((s) & 0xff) <<  8) | (((s) & 0xff00) >> 8)
-#define SWAP_DWORD(s)		(s) = (((s) & 0xff) << 24) | (((s) & 0xff00) << 8) | (((s) & 0xff0000) >> 8) | (((s) & 0xff000000) >> 24)
+#define SWAP_WORD(s) (s) = (((s)&0xff) << 8) | (((s)&0xff00) >> 8)
+#define SWAP_DWORD(s) (s) = (((s)&0xff) << 24) | (((s)&0xff00) << 8) | (((s)&0xff0000) >> 8) | (((s)&0xff000000) >> 24)
 
 #include "pixform.h"
 

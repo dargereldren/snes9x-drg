@@ -4013,13 +4013,24 @@ static uint8 fx4_GetBit(uint8 plane) {
 }
 
 // ALT2 $98 - BEGINDECOMP
+// Packet format (GIGAFX4.md): LOOPCOUNT = LE word at SRC, then SDD-1 stream.
+//   LOOPCOUNT = [src] | ([src+1] << 8); src += 2
+//   then standard SDD-1 decompress_init from remaining stream.
+// Bank-crossing: fx4_rom_read_inc advances ROMB when R14/ROMRPTR wraps.
 static void fx4_begindecomp(void) {
 	struct Fx4Decomp_s *d = &GSU.decomp;
-	uint8 hdr = fx4_rom_read_inc();
-	uint8 hdr2;
+	uint8 lo, hi, hdr, hdr2;
+
+	// Decompressed output length (bytes) into LOOPCOUNT (R12)
+	lo = fx4_rom_read_inc();
+	hi = fx4_rom_read_inc();
+	R12 = USEX16(lo | ((uint32)hi << 8));
 
 	memset(d, 0, sizeof(*d));
 	d->active = 1;
+
+	// SDD-1 header byte (num_planes + context mode)
+	hdr = fx4_rom_read_inc();
 	d->bitplane_type = (uint8)(hdr >> 6);
 
 	switch (d->bitplane_type) {
@@ -4048,6 +4059,7 @@ static void fx4_begindecomp(void) {
 		break;
 	}
 
+	// input = (hdr << 11) | (next_byte << 3), valid_bits = 5
 	hdr2 = fx4_rom_read_inc();
 	d->input = (uint16)((hdr << 11) | (hdr2 << 3));
 	d->valid_bits = 5;

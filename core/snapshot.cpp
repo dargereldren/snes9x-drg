@@ -629,22 +629,8 @@ static FreezeData SnapFX[] =
 		INT_ENTRY(6, vSCBRDirty),
 		// Super FX 4
 		INT_ENTRY(SNAPSHOT_VERSION_FX4, vRngState),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.input),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.valid_bits),
-		ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, decomp.bit_ctr, 8, uint8_ARRAY_V),
-		ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, decomp.context_states, 32, uint8_ARRAY_V),
-		ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, decomp.context_MPS, 32, uint8_ARRAY_V),
-		ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, decomp.prev_bits, 8, uint16_ARRAY_V),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.num_planes),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.bitplane_type),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.high_context_bits),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.low_context_bits),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.plane),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.yloc),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.raw),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.next_byte),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.have_next),
-		INT_ENTRY(SNAPSHOT_VERSION_FX4, decomp.active)};
+		ARRAY_ENTRY(SNAPSHOT_VERSION_FX4, avStack, FX4_STACK_WORDS, uint16_ARRAY_V),
+		INT_ENTRY(SNAPSHOT_VERSION_FX4, vStackPointer)};
 
 #undef STRUCT
 #define STRUCT struct SSA1
@@ -1954,8 +1940,8 @@ int S9xUnfreezeFromStream(STREAM stream) {
 				if (GSU.nRomBanks > 256) {
 					GSU.nRomBanks = 256;
 				}
-				if (GSU.nRamBanks < 1) {
-					GSU.nRamBanks = SuperFX.nRamBanks ? SuperFX.nRamBanks : 1;
+				if (GSU.nRamBanks < FX4_MIN_RAM_BANKS) {
+					GSU.nRamBanks = SuperFX.nRamBanks >= FX4_MIN_RAM_BANKS ? SuperFX.nRamBanks : FX4_MIN_RAM_BANKS;
 				}
 				for (int i = 0; i < 256; i++) {
 					GSU.apvRomBank[i] = &GSU.pvRom[((uint32)i % GSU.nRomBanks) << 16];

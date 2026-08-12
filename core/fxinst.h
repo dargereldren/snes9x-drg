@@ -129,34 +129,17 @@
 #define FX_RAM_BANKS 4
 // Super FX 4 linear RAM: up to 16MB = 256 × 64KB banks
 #define FX4_RAM_BANKS 256
+#define FX4_MIN_RAM_BANKS 6
+#define FX4_MIN_RAM_BYTES 0x60000
 #define FX4_CACHE_SIZE 4096
 #define FX4_GSU_ROM_OFFSET 0xB80000
+#define FX4_STACK_WORDS 256
 
 // Emulate proper R14 ROM access (slower, but safer)
 #define FX_DO_ROMBUFFER
 
 // Address checking (definately slow)
 // #define FX_ADDRESS_CHECK
-
-// Super FX 4 internal SDD-1-style streaming decompressor state
-struct Fx4Decomp_s {
-	uint16 input;
-	int8 valid_bits;
-	uint8 bit_ctr[8];
-	uint8 context_states[32];
-	uint8 context_MPS[32];
-	uint16 prev_bits[8];
-	uint8 num_planes;	 // 0, 2, 4, or 8 (0 = bitplane type 3 / raw)
-	uint8 bitplane_type; // 0-3 from header
-	uint16 high_context_bits;
-	uint16 low_context_bits;
-	uint8 plane;
-	uint8 yloc;
-	uint8 raw;
-	uint8 next_byte;
-	uint8 have_next; // deferred second byte for plane modes
-	uint8 active;
-};
 
 struct FxRegs_s {
 	// FxChip registers
@@ -231,7 +214,8 @@ struct FxRegs_s {
 	uint8 bSeparateGsuRom;
 	uint8 *apvRamBankFx4[FX4_RAM_BANKS];
 	uint32 vRngState;
-	struct Fx4Decomp_s decomp;
+	uint16 avStack[FX4_STACK_WORDS];
+	uint8 vStackPointer;
 };
 
 // Install / restore FX4 opcode table patches (called from FxReset)

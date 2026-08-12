@@ -3706,416 +3706,29 @@ static void fx4_uldw_r9(void) { FX4_ULDW(9); }
 static void fx4_uldw_r10(void) { FX4_ULDW(10); }
 static void fx4_uldw_r11(void) { FX4_ULDW(11); }
 
-// SDD-1 style streaming decompressor (GIGAFX4 / sdd1emu tables)
-static const uint8 fx4_evol_code_size[33] = {
-	0,
-	0,
-	0,
-	0,
-	0,
-	1,
-	1,
-	1,
-	1,
-	2,
-	2,
-	2,
-	2,
-	3,
-	3,
-	3,
-	3,
-	4,
-	4,
-	5,
-	5,
-	6,
-	6,
-	7,
-	7,
-	0,
-	1,
-	2,
-	3,
-	4,
-	5,
-	6,
-	7};
-static const uint8 fx4_evol_mps_next[33] = {
-	25,
-	2,
-	3,
-	4,
-	5,
-	6,
-	7,
-	8,
-	9,
-	10,
-	11,
-	12,
-	13,
-	14,
-	15,
-	16,
-	17,
-	18,
-	19,
-	20,
-	21,
-	22,
-	23,
-	24,
-	24,
-	26,
-	27,
-	28,
-	29,
-	30,
-	31,
-	32,
-	24};
-static const uint8 fx4_evol_lps_next[33] = {
-	25,
-	1,
-	1,
-	2,
-	3,
-	4,
-	5,
-	6,
-	7,
-	8,
-	9,
-	10,
-	11,
-	12,
-	13,
-	14,
-	15,
-	16,
-	17,
-	18,
-	19,
-	20,
-	21,
-	22,
-	23,
-	1,
-	2,
-	4,
-	8,
-	12,
-	16,
-	18,
-	22};
-static const uint8 fx4_run_table[128] = {
-	128,
-	64,
-	96,
-	32,
-	112,
-	48,
-	80,
-	16,
-	120,
-	56,
-	88,
-	24,
-	104,
-	40,
-	72,
-	8,
-	124,
-	60,
-	92,
-	28,
-	108,
-	44,
-	76,
-	12,
-	116,
-	52,
-	84,
-	20,
-	100,
-	36,
-	68,
-	4,
-	126,
-	62,
-	94,
-	30,
-	110,
-	46,
-	78,
-	14,
-	118,
-	54,
-	86,
-	22,
-	102,
-	38,
-	70,
-	6,
-	122,
-	58,
-	90,
-	26,
-	106,
-	42,
-	74,
-	10,
-	114,
-	50,
-	82,
-	18,
-	98,
-	34,
-	66,
-	2,
-	127,
-	63,
-	95,
-	31,
-	111,
-	47,
-	79,
-	15,
-	119,
-	55,
-	87,
-	23,
-	103,
-	39,
-	71,
-	7,
-	123,
-	59,
-	91,
-	27,
-	107,
-	43,
-	75,
-	11,
-	115,
-	51,
-	83,
-	19,
-	99,
-	35,
-	67,
-	3,
-	125,
-	61,
-	93,
-	29,
-	109,
-	45,
-	77,
-	13,
-	117,
-	53,
-	85,
-	21,
-	101,
-	37,
-	69,
-	5,
-	121,
-	57,
-	89,
-	25,
-	105,
-	41,
-	73,
-	9,
-	113,
-	49,
-	81,
-	17,
-	97,
-	33,
-	65,
-	1};
-
-static uint8 fx4_rom_read_inc(void) {
-	uint8 b = ROM(R14);
-	uint32 next = USEX16(R14 + 1);
-	if (next == 0) {
-		GSU.vRomBankReg = (GSU.vRomBankReg + 1) & 0xff;
-		GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg];
-	}
-	R14 = next;
-	return b;
-}
-
-static uint8 fx4_GetCodeword(int code_size) {
-	struct Fx4Decomp_s *d = &GSU.decomp;
-	uint8 tmp;
-
-	if (d->valid_bits == 0) {
-		d->input |= fx4_rom_read_inc();
-		d->valid_bits = 8;
-	}
-	d->input <<= 1;
-	d->valid_bits--;
-	// Match proven sdd1emu polarity
-	d->input ^= 0x8000;
-	if (d->input & 0x8000) {
-		return (uint8)(0x80 + (1 << code_size));
-	}
-	tmp = (uint8)((d->input >> 8) | (0x7f >> code_size));
-	d->input <<= code_size;
-	d->valid_bits = (int8)(d->valid_bits - code_size);
-	if (d->valid_bits < 0) {
-		d->input |= (uint16)(fx4_rom_read_inc() << (-d->valid_bits));
-		d->valid_bits = (int8)(d->valid_bits + 8);
-	}
-	return fx4_run_table[tmp & 0x7f];
-}
-
-static uint8 fx4_ProbGetBit(uint8 context) {
-	struct Fx4Decomp_s *d = &GSU.decomp;
-	uint8 state = d->context_states[context];
-	uint8 code_size = fx4_evol_code_size[state];
-	uint8 pbit;
-
-	if ((d->bit_ctr[code_size] & 0x7f) == 0) {
-		d->bit_ctr[code_size] = fx4_GetCodeword(code_size);
-	}
-
-	pbit = d->context_MPS[context];
-	d->bit_ctr[code_size]--;
-
-	if (d->bit_ctr[code_size] == 0) {
-		d->context_states[context] = fx4_evol_lps_next[state];
-		pbit ^= 1;
-		if (state < 2) {
-			d->context_MPS[context] = pbit;
-		}
-	} else if (d->bit_ctr[code_size] == 0x80) {
-		d->context_states[context] = fx4_evol_mps_next[state];
-	}
-
-	return pbit;
-}
-
-static uint8 fx4_GetBit(uint8 plane) {
-	struct Fx4Decomp_s *d = &GSU.decomp;
-	uint8 context = (uint8)(((plane & 1) << 4) | ((d->prev_bits[plane] & d->high_context_bits) >> 5) | (d->prev_bits[plane] & d->low_context_bits));
-	uint8 pbit = fx4_ProbGetBit(context);
-	d->prev_bits[plane] = (uint16)((d->prev_bits[plane] << 1) + pbit);
-	if (d->num_planes == 0) {
-		d->raw = (uint8)((d->raw >> 1) + (pbit << 7));
-	}
-	return pbit;
-}
-
-// ALT2 $98 - BEGINDECOMP
-// Packet format (GIGAFX4.md): LOOPCOUNT = LE word at SRC, then SDD-1 stream.
-//   LOOPCOUNT = [src] | ([src+1] << 8); src += 2
-//   then standard SDD-1 decompress_init from remaining stream.
-// Bank-crossing: fx4_rom_read_inc advances ROMB when R14/ROMRPTR wraps.
-static void fx4_begindecomp(void) {
-	struct Fx4Decomp_s *d = &GSU.decomp;
-	uint8 lo, hi, hdr, hdr2;
-
-	// Decompressed output length (bytes) into LOOPCOUNT (R12)
-	lo = fx4_rom_read_inc();
-	hi = fx4_rom_read_inc();
-	R12 = USEX16(lo | ((uint32)hi << 8));
-
-	memset(d, 0, sizeof(*d));
-	d->active = 1;
-
-	// SDD-1 header byte (num_planes + context mode)
-	hdr = fx4_rom_read_inc();
-	d->bitplane_type = (uint8)(hdr >> 6);
-
-	switch (d->bitplane_type) {
-	case 0: d->num_planes = 2; break;
-	case 1: d->num_planes = 8; break;
-	case 2: d->num_planes = 4; break;
-	default: d->num_planes = 0; break;
-	}
-
-	switch (hdr & 0x30) {
-	case 0x00:
-		d->high_context_bits = 0x01c0;
-		d->low_context_bits = 0x0001;
-		break;
-	case 0x10:
-		d->high_context_bits = 0x0180;
-		d->low_context_bits = 0x0001;
-		break;
-	case 0x20:
-		d->high_context_bits = 0x00c0;
-		d->low_context_bits = 0x0001;
-		break;
-	default:
-		d->high_context_bits = 0x0180;
-		d->low_context_bits = 0x0003;
-		break;
-	}
-
-	// input = (hdr << 11) | (next_byte << 3), valid_bits = 5
-	hdr2 = fx4_rom_read_inc();
-	d->input = (uint16)((hdr << 11) | (hdr2 << 3));
-	d->valid_bits = 5;
-
-	CLRFLAGS;
+// ALT2 $98 - LOADSTK: DREG = Stack[(SP + SREG) & 0xFF]
+static void fx4_loadstk(void) {
+	uint32 v = GSU.avStack[(GSU.vStackPointer + (uint8)SREG) & 0xFF];
 	R15++;
-	fx4_burn(40);
-}
-
-// ALT2 $99 - READCOMP: one decompressed byte -> DREG (GIGAFX4 decompress_byte)
-static void fx4_readcomp(void) {
-	struct Fx4Decomp_s *d = &GSU.decomp;
-	uint8 out = 0;
-	int i;
-
-	if (!d->active) {
-		R15++;
-		DREG = 0;
-		GSU.vSign = 0;
-		GSU.vZero = 0;
-		TESTR14;
-		CLRFLAGS;
-		return;
-	}
-
-	if (d->num_planes == 0) {
-		// bitplane type 3 / "raw" mode
-		d->raw = 0;
-		for (i = 0; i < 8; i++) {
-			fx4_GetBit((uint8)i);
-		}
-		out = d->raw;
-	} else if ((d->plane & 1) == 0) {
-		for (i = 0; i < 8; i++) {
-			fx4_GetBit(d->plane);
-			fx4_GetBit((uint8)(d->plane + 1));
-		}
-		out = (uint8)(d->prev_bits[d->plane] & 0xff);
-		d->plane = (uint8)(d->plane + 1);
-	} else {
-		out = (uint8)(d->prev_bits[d->plane] & 0xff);
-		d->plane = (uint8)(d->plane - 1);
-		d->yloc++;
-		if (d->yloc == 8) {
-			d->yloc = 0;
-			d->plane = (uint8)((d->plane + 2) & (d->num_planes - 1));
-		}
-	}
-
-	R15++;
-	DREG = USEX8(out);
-	GSU.vSign = USEX8(out) << 8;
-	GSU.vZero = USEX8(out) << 8;
+	DREG = v;
 	TESTR14;
 	CLRFLAGS;
-	fx4_burn(8);
+	fx4_burn(12);
+}
+
+// ALT2 $99 + #byte - SHIFTSTK: SP += byte, #0 resets SP
+static void fx4_shiftstk(void) {
+	uint8 n = PIPE;
+	R15++;
+	FETCHPIPE;
+	R15++;
+	if (n == 0) {
+		GSU.vStackPointer = 0;
+	} else {
+		GSU.vStackPointer = (uint8)(GSU.vStackPointer + n);
+	}
+	CLRFLAGS;
+	fx4_burn(6);
 }
 
 // ALT2 $9A - FX3CMD (reuse Super FX 3 command port)
@@ -4166,72 +3779,131 @@ static void fx4_memset(void) {
 	fx4_burn(size > 200 ? 200 : size);
 }
 
-// ALT3 $98 + #byte - LSR #imm
-static void fx4_lsr_imm(void) {
-	uint8 n = PIPE;
+// ALT3 $98 + #byte - BITOP (SSSSVVVV)
+static void fx4_bitop(void) {
+	uint8 imm = PIPE;
+	uint32 src = USEX16(SREG);
 	uint32 v;
+	uint32 op = imm >> 4;
+	uint32 nibble = imm & 15;
+	uint32 count = nibble + 1;
+	uint32 carry = GSU.vCarry & 1;
+
 	R15++;
 	FETCHPIPE;
 	R15++;
-	n &= 15;
-	if (n == 0) {
-		v = USEX16(SREG);
-		GSU.vCarry = 0;
-	} else {
-		GSU.vCarry = (SREG >> (n - 1)) & 1;
-		v = USEX16(SREG) >> n;
+
+	switch (op) {
+	case 0: // LSR #1-16
+	case 8: // LSRNC
+		GSU.vCarry = (src >> (count - 1)) & 1;
+		v = (count == 16) ? 0 : (src >> count);
+		if (op == 8) {
+			GSU.vCarry = carry;
+		}
+		break;
+	case 1: // LSL #1-16
+	case 3: // ASL #1-16 (same as LSL)
+	case 10: // ASLNC / LSLNC
+		GSU.vCarry = (src >> (16 - count)) & 1;
+		v = (count == 16) ? 0 : USEX16(src << count);
+		if (op == 10) {
+			GSU.vCarry = carry;
+		}
+		break;
+	case 2: // ASR #1-16
+	case 9: // ASRNC
+		GSU.vCarry = (src >> (count - 1)) & 1;
+		v = USEX16((uint32)(SEX16(src) >> (int32)count));
+		if (op == 9) {
+			GSU.vCarry = carry;
+		}
+		break;
+	case 4: // ROL #1-16
+		v = USEX16((src << count) | (src >> (16 - count)));
+		GSU.vCarry = (src >> (16 - count)) & 1;
+		break;
+	case 5: // ROR #1-16
+		v = USEX16((src >> count) | (src << (16 - count)));
+		GSU.vCarry = (src >> (count - 1)) & 1;
+		break;
+	case 6: { // RCL #1-16
+		uint32 wide = (carry << 16) | src;
+		wide = ((wide << count) | (wide >> (17 - count))) & 0x1FFFF;
+		v = USEX16(wide);
+		GSU.vCarry = (wide >> 16) & 1;
+		break;
 	}
+	case 7: { // RCR #1-16
+		uint32 wide = (carry << 16) | src;
+		wide = ((wide >> count) | (wide << (17 - count))) & 0x1FFFF;
+		v = USEX16(wide);
+		GSU.vCarry = (wide >> 16) & 1;
+		break;
+	}
+	case 11: { // POPCNT #1-16
+		uint32 mask = (count == 16) ? 0xFFFFu : ((1u << count) - 1u);
+		uint32 bits = src & mask;
+		v = 0;
+		while (bits) {
+			v += bits & 1;
+			bits >>= 1;
+		}
+		GSU.vCarry = carry;
+		break;
+	}
+	case 12: { // BITEXT #0-15
+		uint32 bit = nibble;
+		if (src & (1u << bit)) {
+			v = src | USEX16(0xFFFFFFFFu << (bit + 1));
+		} else {
+			v = src & ((bit == 15) ? 0xFFFFu : ((1u << (bit + 1)) - 1u));
+		}
+		GSU.vCarry = carry;
+		break;
+	}
+	case 13: // BITSET #0-15
+		v = src | (1u << nibble);
+		GSU.vCarry = carry;
+		break;
+	case 14: // BITCLR #0-15
+		v = src & ~(1u << nibble);
+		GSU.vCarry = carry;
+		break;
+	default: // BITTOG #0-15
+		v = src ^ (1u << nibble);
+		GSU.vCarry = carry;
+		break;
+	}
+
 	DREG = v;
 	GSU.vSign = v;
 	GSU.vZero = v;
 	TESTR14;
 	CLRFLAGS;
+	fx4_burn(12);
 }
 
-// ALT3 $99 + #byte - ASR #imm
-static void fx4_asr_imm(void) {
-	uint8 n = PIPE;
-	int32 s;
-	uint32 v;
-	R15++;
-	FETCHPIPE;
-	R15++;
-	n &= 15;
-	s = SEX16(SREG);
-	if (n == 0) {
-		v = USEX16(SREG);
-		GSU.vCarry = 0;
-	} else {
-		GSU.vCarry = (s >> (n - 1)) & 1;
-		v = USEX16((uint32)(s >> n));
-	}
-	DREG = v;
-	GSU.vSign = v;
-	GSU.vZero = v;
-	TESTR14;
+// ALT3 $99 - PUSH: SP--; Stack[SP] = SREG
+static void fx4_push(void) {
+	GSU.vStackPointer = (uint8)(GSU.vStackPointer - 1);
+	GSU.avStack[GSU.vStackPointer] = (uint16)USEX16(SREG);
 	CLRFLAGS;
+	R15++;
+	fx4_burn(12);
 }
 
-// ALT3 $9A + #byte - ASL #imm
-static void fx4_asl_imm(void) {
-	uint8 n = PIPE;
-	uint32 v;
+// ALT3 $9A - POP: DREG = Stack[SP]; SP++
+static void fx4_pop(void) {
+	uint32 v = GSU.avStack[GSU.vStackPointer];
+	GSU.vStackPointer = (uint8)(GSU.vStackPointer + 1);
 	R15++;
-	FETCHPIPE;
-	R15++;
-	n &= 15;
-	if (n == 0) {
-		v = USEX16(SREG);
-		GSU.vCarry = 0;
-	} else {
-		GSU.vCarry = (SREG >> (16 - n)) & 1;
-		v = USEX16(SREG << n);
-	}
 	DREG = v;
 	GSU.vSign = v;
 	GSU.vZero = v;
 	TESTR14;
 	CLRFLAGS;
+	fx4_burn(12);
 }
 
 // ALT3 $9B + #word - ADD #imm16
@@ -4253,6 +3925,7 @@ static void fx4_add_word(void) {
 	GSU.vOverflow = (SREG ^ v) & (imm ^ v) & 0x8000;
 	TESTR14;
 	CLRFLAGS;
+	fx4_burn(12);
 }
 
 // ALT3 $9C + #word - ADC #imm16
@@ -4274,25 +3947,15 @@ static void fx4_adc_word(void) {
 	GSU.vOverflow = (SREG ^ v) & (imm ^ v) & 0x8000;
 	TESTR14;
 	CLRFLAGS;
+	fx4_burn(12);
 }
 
-// ALT3 $9D + #word - WMULT #imm16
-static void fx4_wmult_word(void) {
-	uint32 imm = PIPE;
-	uint32 c, v;
-	R15++;
-	FETCHPIPE;
-	R15++;
-	imm |= USEX8(PIPE) << 8;
-	FETCHPIPE;
-	R15++;
-	c = (uint32)(SEX16(SREG) * SEX16(imm));
-	v = USEX16(c);
-	DREG = v;
-	GSU.vSign = v;
-	GSU.vZero = v;
-	TESTR14;
+// ALT3 $9D - STRSTK: Stack[(SP + DREG) & 0xFF] = SREG
+static void fx4_strstk(void) {
+	GSU.avStack[(GSU.vStackPointer + (uint8)DREG) & 0xFF] = (uint16)USEX16(SREG);
 	CLRFLAGS;
+	R15++;
+	fx4_burn(12);
 }
 
 // Patch ALT1/2/3 slots for FX4; restore classic handlers when not FX4.
@@ -4510,20 +4173,20 @@ void fx_applyOpcodeTable(void) {
 		}
 
 		// ALT2 $98/$9D
-		fx_OpcodeTable[0x298] = &fx4_begindecomp;
-		fx_OpcodeTable[0x299] = &fx4_readcomp;
+		fx_OpcodeTable[0x298] = &fx4_loadstk;
+		fx_OpcodeTable[0x299] = &fx4_shiftstk;
 		fx_OpcodeTable[0x29a] = &fx4_fx3cmd;
 		fx_OpcodeTable[0x29b] = &fx4_randseed;
 		fx_OpcodeTable[0x29c] = &fx4_rand;
 		fx_OpcodeTable[0x29d] = &fx4_memset;
 
 		// ALT3 $98/$9D
-		fx_OpcodeTable[0x398] = &fx4_lsr_imm;
-		fx_OpcodeTable[0x399] = &fx4_asr_imm;
-		fx_OpcodeTable[0x39a] = &fx4_asl_imm;
+		fx_OpcodeTable[0x398] = &fx4_bitop;
+		fx_OpcodeTable[0x399] = &fx4_push;
+		fx_OpcodeTable[0x39a] = &fx4_pop;
 		fx_OpcodeTable[0x39b] = &fx4_add_word;
 		fx_OpcodeTable[0x39c] = &fx4_adc_word;
-		fx_OpcodeTable[0x39d] = &fx4_wmult_word;
+		fx_OpcodeTable[0x39d] = &fx4_strstk;
 	} else {
 		// Restore classic handlers in slots FX4 may have patched
 		for (i = 0; i < 16; i++) {

@@ -2052,7 +2052,12 @@ bool8 CMemory::LoadSRAM(const char *filename) {
 
 	size = SRAMSize ? (1 << (SRAMSize + 3)) * 128 : 0;
 	if (SuperFX.isFx4) {
-		size = size < (int)SRAM_SIZE ? size : (int)SRAM_SIZE;
+		if (size < (int)FX4_MIN_RAM_BYTES) {
+			size = (int)FX4_MIN_RAM_BYTES;
+		}
+		if (size > (int)SRAM_SIZE) {
+			size = (int)SRAM_SIZE;
+		}
 	} else if (LoROM) {
 		size = size < 0x70000 ? size : 0x70000;
 	} else if (HiROM) {
@@ -2127,7 +2132,12 @@ bool8 CMemory::SaveSRAM(const char *filename) {
 
 	size = SRAMSize ? (1 << (SRAMSize + 3)) * 128 : 0;
 	if (SuperFX.isFx4) {
-		size = size < (int)SRAM_SIZE ? size : (int)SRAM_SIZE;
+		if (size < (int)FX4_MIN_RAM_BYTES) {
+			size = (int)FX4_MIN_RAM_BYTES;
+		}
+		if (size > (int)SRAM_SIZE) {
+			size = (int)SRAM_SIZE;
+		}
 	} else if (LoROM) {
 		size = size < 0x70000 ? size : 0x70000;
 	} else if (HiROM) {
@@ -2396,20 +2406,20 @@ void CMemory::InitROM(void) {
 		if (ROM[0x7FDA] == 0x33) {
 			SRAMSize = ROM[0x7FBD];
 		} else {
-			SRAMSize = SuperFX.isFx4 ? 7 : 5;
+			SRAMSize = SuperFX.isFx4 ? 9 : 5;
 		}
 		if (SuperFX.isFx4) {
-			// GSU sees full SRAM (up to 16MB); SCPU only maps 384KB
-			uint32 sramBytes = SRAMSize ? (1u << (SRAMSize + 3)) * 128u : 0x10000;
-			if (sramBytes < 0x10000) {
-				sramBytes = 0x10000;
+			// GSU sees full SRAM (up to 16MB, min 384KB); SCPU only maps 384KB
+			uint32 sramBytes = SRAMSize ? (1u << (SRAMSize + 3)) * 128u : FX4_MIN_RAM_BYTES;
+			if (sramBytes < FX4_MIN_RAM_BYTES) {
+				sramBytes = FX4_MIN_RAM_BYTES;
 			}
 			if (sramBytes > (uint32)SRAM_SIZE) {
 				sramBytes = (uint32)SRAM_SIZE;
 			}
 			SuperFX.nRamBanks = sramBytes >> 16;
-			if (SuperFX.nRamBanks < 1) {
-				SuperFX.nRamBanks = 1;
+			if (SuperFX.nRamBanks < FX4_MIN_RAM_BANKS) {
+				SuperFX.nRamBanks = FX4_MIN_RAM_BANKS;
 			}
 			if (SuperFX.nRamBanks > FX4_RAM_BANKS) {
 				SuperFX.nRamBanks = FX4_RAM_BANKS;

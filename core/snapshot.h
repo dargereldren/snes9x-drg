@@ -13,7 +13,7 @@
 #define SNAPSHOT_VERSION_IRQ 7
 #define SNAPSHOT_VERSION_BAPU 8
 #define SNAPSHOT_VERSION_IRQ_2018 11 // irq changes were introduced earlier, since this we store NextIRQTimer directly
-#define SNAPSHOT_VERSION_FX4 13		 // Super FX 4 RNG + decomp state
+#define SNAPSHOT_VERSION_FX4 13		 // Super FX 4
 #define SNAPSHOT_VERSION 13
 
 #define SUCCESS 1

@@ -190,8 +190,8 @@ static void FxReset(struct FxInfo_s *psFxInfo) {
 			GSU.nRomBanks = 256;
 		}
 
-		if (GSU.nRamBanks < 1) {
-			GSU.nRamBanks = 1;
+		if (GSU.nRamBanks < FX4_MIN_RAM_BANKS) {
+			GSU.nRamBanks = FX4_MIN_RAM_BANKS;
 		}
 		if (GSU.nRamBanks > FX4_RAM_BANKS) {
 			GSU.nRamBanks = FX4_RAM_BANKS;

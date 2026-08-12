@@ -3999,7 +3999,8 @@ V(V9_V6_V3,2) -> V(V9,2) V(V6,3) V(V3,4) */
 // Voice      0      1      2      3      4      5      6      7
 #define GEN_DSP_TIMING                                                                                                                                              \
 	PHASE(0)                                                                                                                                                        \
-	V(V5, 0) V(V2, 1)                                                                                                                                               \
+	V(V5, 0)                                                                                                                                                        \
+	V(V2, 1)                                                                                                                                                        \
 		PHASE(1) V(V6, 0) V(V3, 1)                                                                                                                                  \
 			PHASE(2) V(V7_V4_V1, 0)                                                                                                                                 \
 				PHASE(3) V(V8_V5_V2, 0)                                                                                                                             \
@@ -4023,11 +4024,14 @@ V(V9_V6_V3,2) -> V(V9,2) V(V6,3) V(V3,4) */
 																						PHASE(21) V(V8, 6) V(V5, 7) V(V2, 0) /* t_brr_next_addr order dependency */ \
 		PHASE(22) V(V3a, 0) V(V9, 6) V(V6, 7) echo_22();                                                                                                            \
 	PHASE(23)                                                                                                                                                       \
-	V(V7, 7) echo_23();                                                                                                                                             \
+	V(V7, 7)                                                                                                                                                        \
+	echo_23();                                                                                                                                                      \
 	PHASE(24)                                                                                                                                                       \
-	V(V8, 7) echo_24();                                                                                                                                             \
+	V(V8, 7)                                                                                                                                                        \
+	echo_24();                                                                                                                                                      \
 	PHASE(25)                                                                                                                                                       \
-	V(V3b, 0) V(V9, 7) echo_25();                                                                                                                                   \
+	V(V3b, 0)                                                                                                                                                       \
+	V(V9, 7) echo_25();                                                                                                                                             \
 	PHASE(26)                                                                                                                                                       \
 	echo_26();                                                                                                                                                      \
 	PHASE(27)                                                                                                                                                       \
@@ -4044,7 +4048,8 @@ V(V9_V6_V3,2) -> V(V9,2) V(V6,3) V(V3,4) */
 	V(V3c, 0)                                                                                                                                                       \
 	echo_30();                                                                                                                                                      \
 	PHASE(31)                                                                                                                                                       \
-	V(V4, 0) V(V1, 2)
+	V(V4, 0)                                                                                                                                                        \
+	V(V1, 2)
 
 #if !SPC_DSP_CUSTOM_RUN
 

@@ -3802,8 +3802,8 @@ static void fx4_bitop(void) {
 			GSU.vCarry = carry;
 		}
 		break;
-	case 1: // LSL #1-16
-	case 3: // ASL #1-16 (same as LSL)
+	case 1:	 // LSL #1-16
+	case 3:	 // ASL #1-16 (same as LSL)
 	case 10: // ASLNC / LSLNC
 		GSU.vCarry = (src >> (16 - count)) & 1;
 		v = (count == 16) ? 0 : USEX16(src << count);

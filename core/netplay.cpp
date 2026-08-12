@@ -164,7 +164,7 @@ on the remote machine on this port?");
 #ifdef __WIN32__
 					WSAGetLastError()
 #else
-					 errno
+					errno
 #endif
 			);
 			S9xNPSetError(buf);

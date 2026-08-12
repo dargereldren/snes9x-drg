@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include "wayland-client.h"
 
-#ifdef  __cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -211,7 +211,6 @@ enum wp_viewporter_error {
 #define WP_VIEWPORTER_DESTROY 0
 #define WP_VIEWPORTER_GET_VIEWPORT 1
 
-
 /**
  * @ingroup iface_wp_viewporter
  */
@@ -223,22 +222,19 @@ enum wp_viewporter_error {
 
 /** @ingroup iface_wp_viewporter */
 static inline void
-wp_viewporter_set_user_data(struct wp_viewporter *wp_viewporter, void *user_data)
-{
-	wl_proxy_set_user_data((struct wl_proxy *) wp_viewporter, user_data);
+wp_viewporter_set_user_data(struct wp_viewporter *wp_viewporter, void *user_data) {
+	wl_proxy_set_user_data((struct wl_proxy *)wp_viewporter, user_data);
 }
 
 /** @ingroup iface_wp_viewporter */
 static inline void *
-wp_viewporter_get_user_data(struct wp_viewporter *wp_viewporter)
-{
-	return wl_proxy_get_user_data((struct wl_proxy *) wp_viewporter);
+wp_viewporter_get_user_data(struct wp_viewporter *wp_viewporter) {
+	return wl_proxy_get_user_data((struct wl_proxy *)wp_viewporter);
 }
 
 static inline uint32_t
-wp_viewporter_get_version(struct wp_viewporter *wp_viewporter)
-{
-	return wl_proxy_get_version((struct wl_proxy *) wp_viewporter);
+wp_viewporter_get_version(struct wp_viewporter *wp_viewporter) {
+	return wl_proxy_get_version((struct wl_proxy *)wp_viewporter);
 }
 
 /**
@@ -249,12 +245,10 @@ wp_viewporter_get_version(struct wp_viewporter *wp_viewporter)
  * wp_viewport objects included.
  */
 static inline void
-wp_viewporter_destroy(struct wp_viewporter *wp_viewporter)
-{
-	wl_proxy_marshal((struct wl_proxy *) wp_viewporter,
-			 WP_VIEWPORTER_DESTROY);
+wp_viewporter_destroy(struct wp_viewporter *wp_viewporter) {
+	wl_proxy_marshal((struct wl_proxy *)wp_viewporter, WP_VIEWPORTER_DESTROY);
 
-	wl_proxy_destroy((struct wl_proxy *) wp_viewporter);
+	wl_proxy_destroy((struct wl_proxy *)wp_viewporter);
 }
 
 /**
@@ -266,14 +260,12 @@ wp_viewporter_destroy(struct wp_viewporter *wp_viewporter)
  * protocol error is raised.
  */
 static inline struct wp_viewport *
-wp_viewporter_get_viewport(struct wp_viewporter *wp_viewporter, struct wl_surface *surface)
-{
+wp_viewporter_get_viewport(struct wp_viewporter *wp_viewporter, struct wl_surface *surface) {
 	struct wl_proxy *id;
 
-	id = wl_proxy_marshal_constructor((struct wl_proxy *) wp_viewporter,
-			 WP_VIEWPORTER_GET_VIEWPORT, &wp_viewport_interface, NULL, surface);
+	id = wl_proxy_marshal_constructor((struct wl_proxy *)wp_viewporter, WP_VIEWPORTER_GET_VIEWPORT, &wp_viewport_interface, NULL, surface);
 
-	return (struct wp_viewport *) id;
+	return (struct wp_viewport *)id;
 }
 
 #ifndef WP_VIEWPORT_ERROR_ENUM
@@ -302,7 +294,6 @@ enum wp_viewport_error {
 #define WP_VIEWPORT_SET_SOURCE 1
 #define WP_VIEWPORT_SET_DESTINATION 2
 
-
 /**
  * @ingroup iface_wp_viewport
  */
@@ -318,22 +309,19 @@ enum wp_viewport_error {
 
 /** @ingroup iface_wp_viewport */
 static inline void
-wp_viewport_set_user_data(struct wp_viewport *wp_viewport, void *user_data)
-{
-	wl_proxy_set_user_data((struct wl_proxy *) wp_viewport, user_data);
+wp_viewport_set_user_data(struct wp_viewport *wp_viewport, void *user_data) {
+	wl_proxy_set_user_data((struct wl_proxy *)wp_viewport, user_data);
 }
 
 /** @ingroup iface_wp_viewport */
 static inline void *
-wp_viewport_get_user_data(struct wp_viewport *wp_viewport)
-{
-	return wl_proxy_get_user_data((struct wl_proxy *) wp_viewport);
+wp_viewport_get_user_data(struct wp_viewport *wp_viewport) {
+	return wl_proxy_get_user_data((struct wl_proxy *)wp_viewport);
 }
 
 static inline uint32_t
-wp_viewport_get_version(struct wp_viewport *wp_viewport)
-{
-	return wl_proxy_get_version((struct wl_proxy *) wp_viewport);
+wp_viewport_get_version(struct wp_viewport *wp_viewport) {
+	return wl_proxy_get_version((struct wl_proxy *)wp_viewport);
 }
 
 /**
@@ -343,12 +331,10 @@ wp_viewport_get_version(struct wp_viewport *wp_viewport)
  * The change is applied on the next wl_surface.commit.
  */
 static inline void
-wp_viewport_destroy(struct wp_viewport *wp_viewport)
-{
-	wl_proxy_marshal((struct wl_proxy *) wp_viewport,
-			 WP_VIEWPORT_DESTROY);
+wp_viewport_destroy(struct wp_viewport *wp_viewport) {
+	wl_proxy_marshal((struct wl_proxy *)wp_viewport, WP_VIEWPORT_DESTROY);
 
-	wl_proxy_destroy((struct wl_proxy *) wp_viewport);
+	wl_proxy_destroy((struct wl_proxy *)wp_viewport);
 }
 
 /**
@@ -367,10 +353,8 @@ wp_viewport_destroy(struct wp_viewport *wp_viewport)
  * applied on the next wl_surface.commit.
  */
 static inline void
-wp_viewport_set_source(struct wp_viewport *wp_viewport, wl_fixed_t x, wl_fixed_t y, wl_fixed_t width, wl_fixed_t height)
-{
-	wl_proxy_marshal((struct wl_proxy *) wp_viewport,
-			 WP_VIEWPORT_SET_SOURCE, x, y, width, height);
+wp_viewport_set_source(struct wp_viewport *wp_viewport, wl_fixed_t x, wl_fixed_t y, wl_fixed_t width, wl_fixed_t height) {
+	wl_proxy_marshal((struct wl_proxy *)wp_viewport, WP_VIEWPORT_SET_SOURCE, x, y, width, height);
 }
 
 /**
@@ -389,13 +373,11 @@ wp_viewport_set_source(struct wp_viewport *wp_viewport, wl_fixed_t x, wl_fixed_t
  * applied on the next wl_surface.commit.
  */
 static inline void
-wp_viewport_set_destination(struct wp_viewport *wp_viewport, int32_t width, int32_t height)
-{
-	wl_proxy_marshal((struct wl_proxy *) wp_viewport,
-			 WP_VIEWPORT_SET_DESTINATION, width, height);
+wp_viewport_set_destination(struct wp_viewport *wp_viewport, int32_t width, int32_t height) {
+	wl_proxy_marshal((struct wl_proxy *)wp_viewport, WP_VIEWPORT_SET_DESTINATION, width, height);
 }
 
-#ifdef  __cplusplus
+#ifdef __cplusplus
 }
 #endif
 

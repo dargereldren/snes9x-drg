@@ -34,10 +34,10 @@
  *
  * Other internal registers
  * 3030 - SFR   status flag register  (16bit)
- * 3032 - unused
+ * 3032 - FX4   S-CPU LoROM bankswitch (nibble L=$00-$3F, H=$80-$BF, 1MB steps)
  * 3033 - BRAMR Backup RAM register    (8bit)
  * 3034 - PBR   program bank register  (8bit)
- * 3035 - unused
+ * 3035 - FX4   S-CPU HiROM bankswitch (nibble L=$C0-$FF, H=$40-$77, 1MB steps)
  * 3036 - ROMBR rom bank register      (8bit)
  * 3037 - CFGR  control flags register (8bit)
  * 3038 - SCBR  screen base register   (8bit)
@@ -45,7 +45,7 @@
  * 303a - SCMR  screen mode register   (8bit)
  * 303b - VCR   version code register  (8bit) (read only)
  * 303c - RAMBR ram bank register      (8bit)
- * 303d - unused
+ * 303d - FX4   GSU ROM window offset  (8bit, 1MB steps; ROMB/PBR/GETB/fetch)
  * 303e - CBR   cache base register   (16bit)
  *
  * 3040-30ff -  unused
@@ -132,7 +132,7 @@
 #define FX4_MIN_RAM_BANKS 6
 #define FX4_MIN_RAM_BYTES 0x60000
 #define FX4_CACHE_SIZE 4096
-#define FX4_GSU_ROM_OFFSET 0xB80000
+#define FX4_MAX_ROM_SIZE 0x10F00000 // 271MB: 255MB $303D window + 16MB GSU space
 #define FX4_STACK_WORDS 256
 
 // Emulate proper R14 ROM access (slower, but safer)
@@ -177,7 +177,7 @@ struct FxRegs_s {
 	uint32 nRamBanks;	// Number of 64kb-banks in FxRam (Don't confuse it with SNES-Ram!!!)
 	uint8 *pvRam;		// Pointer to FxRam
 	uint32 nRomBanks;	// Number of 32kb-banks in Cart-ROM (FX4: 64kb banks)
-	uint8 *pvRom;		// Pointer to Cart-ROM (FX4: GSU ROM base)
+	uint8 *pvRom;		// Pointer to Cart-ROM
 
 	uint32 vMode;	  // Color depth/mode
 	uint32 vPrevMode; // Previous depth
@@ -211,7 +211,6 @@ struct FxRegs_s {
 
 	// --- Super FX 4 / GIGA-1 (fields after bFx3 keep classic snapshot offsets stable) ---
 	uint8 bFx4;
-	uint8 bSeparateGsuRom;
 	uint8 *apvRamBankFx4[FX4_RAM_BANKS];
 	uint32 vRngState;
 	uint16 avStack[FX4_STACK_WORDS];
@@ -241,8 +240,10 @@ extern struct FxRegs_s GSU;
 #define GSU_R14 0x01c
 #define GSU_R15 0x01e
 #define GSU_SFR 0x030
+#define GSU_FX4BSW1 0x032
 #define GSU_BRAMR 0x033
 #define GSU_PBR 0x034
+#define GSU_FX4BSW2 0x035
 #define GSU_ROMBR 0x036
 #define GSU_CFGR 0x037
 #define GSU_SCBR 0x038
@@ -250,6 +251,7 @@ extern struct FxRegs_s GSU;
 #define GSU_SCMR 0x03a
 #define GSU_VCR 0x03b
 #define GSU_RAMBR 0x03c
+#define GSU_FX4BSW3 0x03d
 #define GSU_CBR 0x03e
 #define GSU_CACHERAM 0x100
 

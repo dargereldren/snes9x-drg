@@ -42,7 +42,12 @@ size_t load_jma_file(const char *filename, unsigned char *buffer)
       return(0);
     }
 
-    JMAFile.extract_file(our_file_name, buffer);
+    if (!Memory.EnsureROMBuffer((uint32)our_file_size))
+    {
+      return(0);
+    }
+
+    JMAFile.extract_file(our_file_name, Memory.ROM);
 
     return(our_file_size);
   }

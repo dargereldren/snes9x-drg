@@ -1922,41 +1922,25 @@ int S9xUnfreezeFromStream(STREAM stream) {
 			// Re-apply cart-derived FX flags and bank tables (not authoritative in snapshot)
 			GSU.bFx3 = SuperFX.isFx3;
 			GSU.bFx4 = SuperFX.isFx4;
-			GSU.bSeparateGsuRom = SuperFX.hasSeparateGsuRom;
 			GSU.pvRegisters = SuperFX.pvRegisters;
 			GSU.pvRam = SuperFX.pvRam;
 			if (GSU.bFx4) {
-				uint8 *gsuRom = SuperFX.pvRom;
-				uint32 gsuRomSize = Memory.CalculatedSize;
-				if (GSU.bSeparateGsuRom && Memory.CalculatedSize > FX4_GSU_ROM_OFFSET) {
-					gsuRom = SuperFX.pvRom + FX4_GSU_ROM_OFFSET;
-					gsuRomSize = Memory.CalculatedSize - FX4_GSU_ROM_OFFSET;
-				} else if (GSU.bSeparateGsuRom) {
-					gsuRom = SuperFX.pvRom + FX4_GSU_ROM_OFFSET;
-					gsuRomSize = 0;
-				}
-				GSU.pvRom = gsuRom;
-				GSU.nRomBanks = gsuRomSize ? ((gsuRomSize + 0xffff) >> 16) : 1;
-				if (GSU.nRomBanks > 256) {
-					GSU.nRomBanks = 256;
-				}
 				if (GSU.nRamBanks < FX4_MIN_RAM_BANKS) {
 					GSU.nRamBanks = SuperFX.nRamBanks >= FX4_MIN_RAM_BANKS ? SuperFX.nRamBanks : FX4_MIN_RAM_BANKS;
-				}
-				for (int i = 0; i < 256; i++) {
-					GSU.apvRomBank[i] = &GSU.pvRom[((uint32)i % GSU.nRomBanks) << 16];
 				}
 				for (int i = 0; i < FX4_RAM_BANKS; i++) {
 					GSU.apvRamBankFx4[i] = &GSU.pvRam[((uint32)i % GSU.nRamBanks) << 16];
 				}
-				GSU.pvRamBank = GSU.apvRamBankFx4[GSU.vRamBankReg % GSU.nRamBanks];
+				GSU.pvRamBank = GSU.apvRamBankFx4[GSU.vRamBankReg % (GSU.nRamBanks ? GSU.nRamBanks : 1)];
 				GSU.pvCache = &GSU.pvRegisters[0x40];
+				fx_rebuildFx4RomBanks();
+				Memory.Map_SuperFX4RomWindows();
 			} else {
 				GSU.pvRom = SuperFX.pvRom;
 				GSU.pvCache = &GSU.pvRegisters[0x100];
+				GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg & 0xff];
+				GSU.pvPrgBank = GSU.apvRomBank[GSU.vPrgBankReg & 0xff];
 			}
-			GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg & 0xff];
-			GSU.pvPrgBank = GSU.apvRomBank[GSU.vPrgBankReg & 0xff];
 			fx_applyOpcodeTable();
 		}
 

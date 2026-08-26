@@ -94,6 +94,14 @@ bool8 LoadZip(const char *zipname, uint32 *TotalFileSize, uint8 *buffer) {
 		assert(info.uncompressed_size <= CMemory::MAX_ROM_SIZE + 512);
 
 		uint32 FileSize = info.uncompressed_size;
+		uint32 already = (uint32)(ptr - buffer);
+		if (!Memory.EnsureROMBuffer(FileSize + already)) {
+			unzCloseCurrentFile(file);
+			unzClose(file);
+			return (FALSE);
+		}
+		buffer = Memory.ROM;
+		ptr = Memory.ROM + already;
 		int l = unzReadCurrentFile(file, ptr, FileSize);
 
 		if (unzCloseCurrentFile(file) == UNZ_CRCERROR) {

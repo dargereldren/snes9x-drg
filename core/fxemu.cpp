@@ -31,6 +31,9 @@ void S9xResetSuperFX(void) {
 	SuperFX.vFlags = 0;
 	CPU.IRQExternal = FALSE;
 	FxReset(&SuperFX);
+	if (SuperFX.isFx4) {
+		Memory.Map_SuperFX4RomWindows();
+	}
 }
 
 void S9xSetSuperFX(uint8 byte, uint16 address) {
@@ -56,12 +59,26 @@ void S9xSetSuperFX(uint8 byte, uint16 address) {
 		Memory.FillRAM[0x3031] = byte;
 		break;
 
+	case 0x3032:
+		Memory.FillRAM[0x3032] = byte;
+		if (SuperFX.isFx4) {
+			Memory.Map_SuperFX4RomWindows();
+		}
+		break;
+
 	case 0x3033:
 		Memory.FillRAM[0x3033] = byte;
 		break;
 
 	case 0x3034:
 		Memory.FillRAM[0x3034] = SuperFX.isFx4 ? byte : (byte & 0x7f);
+		break;
+
+	case 0x3035:
+		Memory.FillRAM[0x3035] = byte;
+		if (SuperFX.isFx4) {
+			Memory.Map_SuperFX4RomWindows();
+		}
 		break;
 
 	case 0x3036:
@@ -91,6 +108,13 @@ void S9xSetSuperFX(uint8 byte, uint16 address) {
 	case 0x303c:
 		Memory.FillRAM[0x303c] = byte;
 		fx_updateRamBank(byte);
+		break;
+
+	case 0x303d:
+		Memory.FillRAM[0x303d] = byte;
+		if (SuperFX.isFx4) {
+			fx_rebuildFx4RomBanks();
+		}
 		break;
 
 	case 0x303f:
@@ -160,36 +184,10 @@ static void FxReset(struct FxInfo_s *psFxInfo) {
 	GSU.pvRom = psFxInfo->pvRom;
 	GSU.bFx3 = psFxInfo->isFx3;
 	GSU.bFx4 = psFxInfo->isFx4;
-	GSU.bSeparateGsuRom = psFxInfo->hasSeparateGsuRom;
 	GSU.vPrevScreenHeight = ~0;
 	GSU.vPrevMode = ~0;
 
 	if (GSU.bFx4) {
-		// FX4: linear 64KB ROM banks; optional private GSU ROM at +0xB80000
-		uint8 *gsuRom = GSU.pvRom;
-		uint32 gsuRomSize = Memory.CalculatedSize;
-
-		if (GSU.bSeparateGsuRom) {
-			if (Memory.CalculatedSize > FX4_GSU_ROM_OFFSET) {
-				gsuRom = GSU.pvRom + FX4_GSU_ROM_OFFSET;
-				gsuRomSize = Memory.CalculatedSize - FX4_GSU_ROM_OFFSET;
-			} else {
-				// No extra payload: empty/open bus style (still point past cart)
-				gsuRom = GSU.pvRom + FX4_GSU_ROM_OFFSET;
-				gsuRomSize = 0;
-			}
-		}
-
-		GSU.pvRom = gsuRom;
-		// nRomBanks as number of 64KB banks
-		GSU.nRomBanks = gsuRomSize ? ((gsuRomSize + 0xffff) >> 16) : 1;
-		if (GSU.nRomBanks < 1) {
-			GSU.nRomBanks = 1;
-		}
-		if (GSU.nRomBanks > 256) {
-			GSU.nRomBanks = 256;
-		}
-
 		if (GSU.nRamBanks < FX4_MIN_RAM_BANKS) {
 			GSU.nRamBanks = FX4_MIN_RAM_BANKS;
 		}
@@ -197,15 +195,11 @@ static void FxReset(struct FxInfo_s *psFxInfo) {
 			GSU.nRamBanks = FX4_RAM_BANKS;
 		}
 
-		// Clear register file + 4KB cache window ($3000/$3FFF)
+		// Clear register file + 4KB cache window ($3000/$3FFF); $303D = 0
 		memset(GSU.pvRegisters, 0, 0x1000);
 		GSU.pvRegisters[0x3b] = 0x54; // VCR
 
-		// Linear ROM banks $00/$FF
-		for (int i = 0; i < 256; i++) {
-			uint32 b = (uint32)i % GSU.nRomBanks;
-			GSU.apvRomBank[i] = &GSU.pvRom[b << 16];
-		}
+		fx_rebuildFx4RomBanks();
 
 		// Linear RAM banks (full SRAM)
 		for (int i = 0; i < FX4_RAM_BANKS; i++) {
@@ -263,6 +257,54 @@ static void FxReset(struct FxInfo_s *psFxInfo) {
 
 	fx_applyOpcodeTable();
 	fx_readRegisterSpace();
+}
+
+void fx_rebuildFx4RomBanks(void) {
+	uint8 *base = SuperFX.pvRom;
+	uint32 size = Memory.CalculatedSize;
+
+	GSU.pvRom = base;
+
+	uint32 offset = 0;
+	if (GSU.pvRegisters) {
+		offset = (uint32)GSU.pvRegisters[GSU_FX4BSW3] * 0x100000u;
+	}
+
+	if (size == 0) {
+		GSU.nRomBanks = 1;
+		for (int i = 0; i < 256; i++) {
+			GSU.apvRomBank[i] = Memory.ROM;
+		}
+	} else {
+		if (offset >= size) {
+			offset %= size;
+		}
+
+		uint8 *window = base + offset;
+		uint32 avail = size - offset;
+		GSU.nRomBanks = (avail + 0xffff) >> 16;
+		if (GSU.nRomBanks < 1) {
+			GSU.nRomBanks = 1;
+		}
+		if (GSU.nRomBanks > 256) {
+			GSU.nRomBanks = 256;
+		}
+
+		uint8 *romEnd = Memory.ROM + Memory.ROMAllocSize();
+		uint8 *safe = (Memory.ROMAllocSize() >= 0x10000) ? (romEnd - 0x10000) : Memory.ROM;
+
+		for (int i = 0; i < 256; i++) {
+			uint32 addr = Memory.map_mirror(avail, ((uint32)i % GSU.nRomBanks) << 16);
+			uint8 *p = window + addr;
+			if (p + 0x10000 > romEnd) {
+				p = safe;
+			}
+			GSU.apvRomBank[i] = p;
+		}
+	}
+
+	GSU.pvRomBank = GSU.apvRomBank[GSU.vRomBankReg & 0xff];
+	GSU.pvPrgBank = GSU.apvRomBank[GSU.vPrgBankReg & 0xff];
 }
 
 static void fx_readRegisterSpace(void) {

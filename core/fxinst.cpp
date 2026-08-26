@@ -3743,6 +3743,7 @@ static void fx4_randseed(void) {
 	GSU.vRngState = USEX16(SREG);
 	CLRFLAGS;
 	R15++;
+	fx4_burn(6);
 }
 
 // ALT2 $9C - RAND
@@ -3756,6 +3757,7 @@ static void fx4_rand(void) {
 	GSU.vZero = v;
 	TESTR14;
 	CLRFLAGS;
+	fx4_burn(12);
 }
 
 // ALT2 $9D + #byte - MEMSET: DREG=ptr, SREG=size, imm=fill
@@ -3775,8 +3777,7 @@ static void fx4_memset(void) {
 
 	GSU.vLastRamAdr = USEX16(adr + (size ? size - 1 : 0));
 	CLRFLAGS;
-	// rough cost proportional to size, capped
-	fx4_burn(size > 200 ? 200 : size);
+	fx4_burn(size + 6);
 }
 
 // ALT3 $98 + #byte - BITOP (SSSSVVVV)

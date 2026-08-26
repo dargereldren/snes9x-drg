@@ -1130,8 +1130,8 @@ bool8 CMemory::Init(void) {
 		return (FALSE);
 	}
 
-	ROMStorage.resize(MAX_ROM_SIZE + 0x200 + 0x8000);
-	std::fill(ROMStorage.begin(), ROMStorage.end(), 0);
+	ROMStorage.reserve((size_t)MAX_ROM_SIZE + 0x200 + 0x8000);
+	ROMStorage.resize((size_t)DEFAULT_ROM_ALLOC + 0x200 + 0x8000, 0);
 	SRAMStorage.resize(SRAM_SIZE);
 	std::fill(SRAMStorage.begin(), SRAMStorage.end(), 0);
 	SRAM = &SRAMStorage[0];
@@ -1155,29 +1155,69 @@ bool8 CMemory::Init(void) {
 	memset(IPPU.TileCached[TILE_4BIT_ODD], 0, MAX_4BIT_TILES);
 
 	// FillRAM uses first 32K of ROM image area, otherwise space just
-	// wasted. Might be read by the SuperFX code.
-
-	FillRAM = &ROMStorage[0];
-
-	// Add 0x8000 to ROM image pointer to stop SuperFX code accessing
-	// unallocated memory (can cause crash on some ports).
-
-	ROM = &ROMStorage[0x8000];
-
-	C4RAM = ROM + 0x400000 + 8192 * 8; // C4
-	OBC1RAM = ROM + 0x400000;		   // OBC1
-	BIOSROM = ROM + 0x300000;		   // BS
-	BSRAM = ROM + 0x400000;			   // BS
-
-	SuperFX.pvRegisters = FillRAM + 0x3000;
+	// wasted. Might be read by the SuperFX code. ROM is offset +0x8000 so
+	// SuperFX bank tables cannot walk off the front of the allocation.
+	RebindROMPointers();
 	SuperFX.nRamBanks = 2; // Most only use 1.  1=64KB=512Mb, 2=128KB=1024Mb
 	SuperFX.pvRam = SRAM;
 	SuperFX.nRomBanks = (2 * 1024 * 1024) / (32 * 1024);
-	SuperFX.pvRom = (uint8 *)ROM;
 
 	PostRomInitFunc = NULL;
 
 	return (TRUE);
+}
+
+void CMemory::RebindROMPointers(void) {
+	FillRAM = &ROMStorage[0];
+	ROM = &ROMStorage[0x8000];
+	C4RAM = ROM + 0x400000 + 8192 * 8;
+	OBC1RAM = ROM + 0x400000;
+	BIOSROM = ROM + 0x300000;
+	BSRAM = ROM + 0x400000;
+	SuperFX.pvRegisters = FillRAM + 0x3000;
+	SuperFX.pvRom = (uint8 *)ROM;
+}
+
+uint32 CMemory::ROMAllocSize(void) const {
+	if (ROMStorage.size() <= 0x8000) {
+		return 0;
+	}
+
+	return (uint32)(ROMStorage.size() - 0x8000);
+}
+
+uint8 *CMemory::ROMScratch(void) {
+	uint32 n = ROMAllocSize();
+	if (n < 0x10000) {
+		return ROM;
+	}
+
+	return ROM + (n - 0x10000);
+}
+
+bool8 CMemory::EnsureROMBuffer(uint32 imageBytes) {
+	uint64 need = (uint64)imageBytes + 0x200 + 0x8000;
+	uint64 maxNeed = (uint64)MAX_ROM_SIZE + 0x200 + 0x8000;
+	uint64 minNeed = (uint64)DEFAULT_ROM_ALLOC + 0x200 + 0x8000;
+
+	if (need < minNeed) {
+		need = minNeed;
+	}
+	if (need > maxNeed) {
+		need = maxNeed;
+	}
+	if (ROMStorage.size() >= (size_t)need) {
+		return TRUE;
+	}
+
+	try {
+		ROMStorage.resize((size_t)need, 0);
+	} catch (...) {
+		return FALSE;
+	}
+
+	RebindROMPointers();
+	return TRUE;
 }
 
 void CMemory::Deinit(void) {
@@ -1515,7 +1555,10 @@ bool8 CMemory::LoadROMMem(const uint8 *source, uint32 sourceSize, const char *op
 	}
 
 	do {
-		memset(ROM, 0, MAX_ROM_SIZE);
+		if (!EnsureROMBuffer(sourceSize)) {
+			return FALSE;
+		}
+		memset(ROM, 0, ROMAllocSize());
 		memset(&Multi, 0, sizeof(Multi));
 		memcpy(ROM, source, sourceSize);
 	} while (!LoadROMInt(sourceSize));
@@ -1533,9 +1576,18 @@ bool8 CMemory::LoadROM(const char *filename) {
 	int32 totalFileSize;
 
 	do {
-		memset(ROM, 0, MAX_ROM_SIZE);
+		uint32 want = MAX_ROM_SIZE;
+		struct stat st;
+		if (stat(filename, &st) == 0 && st.st_size > 0 && (uint64)st.st_size <= MAX_ROM_SIZE + 0x200) {
+			want = (uint32)st.st_size;
+		}
+		if (!EnsureROMBuffer(want)) {
+			return (FALSE);
+		}
+		memset(ROM, 0, ROMAllocSize());
 		memset(&Multi, 0, sizeof(Multi));
-		totalFileSize = FileLoader(ROM, filename, MAX_ROM_SIZE);
+		uint32 loadCap = (ROMAllocSize() > 0x200) ? (ROMAllocSize() - 0x200) : 0;
+		totalFileSize = FileLoader(ROM, filename, loadCap);
 
 		if (!totalFileSize) {
 			return (FALSE);
@@ -1599,10 +1651,6 @@ bool8 CMemory::LoadROMInt(int32 ROMfillSize) {
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAC30 &&
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAD20 &&
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAD30 &&
-		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAE20 &&
-		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAE30 &&
-		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAF20 &&
-		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0xAF30 &&
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x3423 && // exclude SA-1
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x3523 &&
 		(ROM[0x7fd5] + (ROM[0x7fd6] << 8)) != 0x4332 && // exclude S-DD1
@@ -1760,7 +1808,7 @@ bool8 CMemory::LoadROMInt(int32 ROMfillSize) {
 
 bool8 CMemory::LoadMultiCartMem(const uint8 *sourceA, uint32 sourceASize, const uint8 *sourceB, uint32 sourceBSize, const uint8 *bios, uint32 biosSize) {
 	uint32 offset = 0;
-	memset(ROM, 0, MAX_ROM_SIZE);
+	memset(ROM, 0, ROMAllocSize());
 	memset(&Multi, 0, sizeof(Multi));
 
 	if (bios) {
@@ -1794,14 +1842,15 @@ bool8 CMemory::LoadMultiCartMem(const uint8 *sourceA, uint32 sourceASize, const 
 bool8 CMemory::LoadMultiCart(const char *cartA, const char *cartB) {
 	S9xResetSaveTimer(FALSE); // reset oops timer here so that .oops file has rom name of previous rom
 
-	memset(ROM, 0, MAX_ROM_SIZE);
+	memset(ROM, 0, ROMAllocSize());
 	memset(&Multi, 0, sizeof(Multi));
 
 	Settings.DisplayColor = BUILD_PIXEL(31, 31, 31);
 	SET_UI_COLOR(255, 255, 255);
 
+	uint32 loadCap = (ROMAllocSize() > 0x200) ? (ROMAllocSize() - 0x200) : 0;
 	if (cartB && cartB[0]) {
-		Multi.cartSizeB = FileLoader(ROM, cartB, MAX_ROM_SIZE);
+		Multi.cartSizeB = FileLoader(ROM, cartB, loadCap);
 	}
 
 	if (Multi.cartSizeB) {
@@ -1814,7 +1863,7 @@ bool8 CMemory::LoadMultiCart(const char *cartA, const char *cartB) {
 	}
 
 	if (cartA && cartA[0]) {
-		Multi.cartSizeA = FileLoader(ROM, cartA, MAX_ROM_SIZE);
+		Multi.cartSizeA = FileLoader(ROM, cartA, loadCap);
 	}
 
 	if (Multi.cartSizeA) {
@@ -2022,8 +2071,8 @@ bool8 CMemory::SaveSRTC(void) {
 
 void CMemory::ClearSRAM(bool8 onlyNonSavedSRAM) {
 	if (onlyNonSavedSRAM) {
-		// SuperFX without battery: $13-$14 have, $15+ no; FX3 $17 no / $18 yes; FX4 $AC/$AE no, $AD/$AF yes
-		if (!(Settings.SuperFX && (ROMType < 0x15 || ROMType == 0x17 || ROMType == 0xAC || ROMType == 0xAE)) &&
+		// SuperFX without battery: $13-$14 have, $15+ no; FX3 $17 no / $18 yes; FX4 $AC no, $AD yes
+		if (!(Settings.SuperFX && (ROMType < 0x15 || ROMType == 0x17 || ROMType == 0xAC)) &&
 			!(Settings.SA1 && ROMType == 0x34)) { // can have SRAM
 			return;
 		}
@@ -2106,7 +2155,7 @@ bool8 CMemory::LoadSRAM(const char *filename) {
 }
 
 bool8 CMemory::SaveSRAM(const char *filename) {
-	if (Settings.SuperFX && (ROMType < 0x15 || ROMType == 0x17 || ROMType == 0xAC || ROMType == 0xAE)) { // doesn't have SRAM
+	if (Settings.SuperFX && (ROMType < 0x15 || ROMType == 0x17 || ROMType == 0xAC)) { // doesn't have SRAM
 		return (TRUE);
 	}
 
@@ -2243,7 +2292,6 @@ void CMemory::InitROM(void) {
 	Settings.SuperFX = FALSE;
 	SuperFX.isFx3 = FALSE;
 	SuperFX.isFx4 = FALSE;
-	SuperFX.hasSeparateGsuRom = FALSE;
 	Settings.DSP = 0;
 	Settings.SA1 = FALSE;
 	Settings.C4 = FALSE;
@@ -2368,19 +2416,12 @@ void CMemory::InitROM(void) {
 		Settings.SA1 = TRUE;
 		break;
 
-	// Super FX 4 / GIGA-1 ($AC-$AF, Slow/Fast)
+	// Super FX 4 / GIGA-1 ($AC no battery, $AD battery; Slow/Fast)
 	case 0xAC20:
 	case 0xAC30:
 	case 0xAD20:
 	case 0xAD30:
-	case 0xAE20:
-	case 0xAE30:
-	case 0xAF20:
-	case 0xAF30:
 		SuperFX.isFx4 = TRUE;
-		if (ROMType == 0xAE || ROMType == 0xAF) {
-			SuperFX.hasSeparateGsuRom = TRUE;
-		}
 		// Fall through
 	// Super FX 3 (LRG, $18 = FX3+battery)
 	case 0x1720:
@@ -3162,21 +3203,76 @@ void CMemory::Map_SuperFX3LoROMMap(void) {
 	map_WriteProtectROM();
 }
 
-// Super FX 4 / GIGA-1: 11.5MB SNES window, GSU MMIO at $3000-$3FFF,
-// SRAM at $78-$7D (384KB), $5000-$7FFF mirrors $78:0000.
-// No classic 32K SuperFX ROM mirror table (would clobber GSU ROM at 0xB80000).
+// Super FX 4 / GIGA-1: bankswitched SNES windows ($3032/$3035), GSU MMIO at
+// $3000-$3FFF, SRAM at $78-$7D (384KB), $5000-$7FFF mirrors $78:0000.
+// No classic 32K SuperFX ROM mirror table.
+void CMemory::Map_SuperFX4RomWindows(void) {
+	uint8 bsw1 = FillRAM[0x3032];
+	uint8 bsw2 = FillRAM[0x3035];
+	uint32 off00 = (uint32)(bsw1 & 0x0f) << 20;
+	uint32 off80 = (uint32)((bsw1 >> 4) & 0x0f) << 20;
+	uint32 offC0 = (uint32)(bsw2 & 0x0f) << 20;
+	uint32 off40 = (uint32)((bsw2 >> 4) & 0x0f) << 20;
+	uint32 size00 = 0x200000;
+	uint32 size80 = 0x200000;
+	uint32 sizeC0 = 0x400000;
+	uint32 size40 = 0x380000;
+
+	if (CalculatedSize == 0) {
+		off00 = off80 = offC0 = off40 = 0;
+		size00 = size80 = sizeC0 = size40 = 1;
+	} else {
+		if (off00 >= CalculatedSize) {
+			off00 %= CalculatedSize;
+		}
+		if (off80 >= CalculatedSize) {
+			off80 %= CalculatedSize;
+		}
+		if (offC0 >= CalculatedSize) {
+			offC0 %= CalculatedSize;
+		}
+		if (off40 >= CalculatedSize) {
+			off40 %= CalculatedSize;
+		}
+		if (size00 > CalculatedSize - off00) {
+			size00 = CalculatedSize - off00;
+		}
+		if (size80 > CalculatedSize - off80) {
+			size80 = CalculatedSize - off80;
+		}
+		if (sizeC0 > CalculatedSize - offC0) {
+			sizeC0 = CalculatedSize - offC0;
+		}
+		if (size40 > CalculatedSize - off40) {
+			size40 = CalculatedSize - off40;
+		}
+		if (size00 == 0) {
+			size00 = 1;
+		}
+		if (size80 == 0) {
+			size80 = 1;
+		}
+		if (sizeC0 == 0) {
+			sizeC0 = 1;
+		}
+		if (size40 == 0) {
+			size40 = 1;
+		}
+	}
+
+	map_lorom_offset(0x00, 0x3f, 0x8000, 0xffff, size00, off00);
+	map_lorom_offset(0x80, 0xbf, 0x8000, 0xffff, size80, off80);
+	map_hirom_offset(0xc0, 0xff, 0x0000, 0xffff, sizeC0, offC0);
+	map_hirom_offset(0x40, 0x77, 0x0000, 0xffff, size40, off40);
+
+	map_WriteProtectROM();
+}
+
 void CMemory::Map_SuperFX4LoROMMap(void) {
 	printf("Map_SuperFX4LoROMMap\n");
 	map_System();
 
-	// $00-$3F:$8000-$FFFF -> first 2MB
-	map_lorom(0x00, 0x3f, 0x8000, 0xffff, 0x200000);
-	// $80-$BF:$8000-$FFFF -> second 2MB
-	map_lorom_offset(0x80, 0xbf, 0x8000, 0xffff, 0x200000, 0x200000);
-	// $C0-$FF:$0000-$FFFF -> third 4MB (HiROM)
-	map_hirom_offset(0xc0, 0xff, 0x0000, 0xffff, 0x400000, 0x400000);
-	// $40-$77:$0000-$FFFF -> fourth 3.5MB (HiROM)
-	map_hirom_offset(0x40, 0x77, 0x0000, 0xffff, 0x380000, 0x800000);
+	Map_SuperFX4RomWindows();
 
 	// $78-$7D: SRAM (384KB exposed to SCPU; rest is GSU-only)
 	map_space(0x78, 0x78, 0x0000, 0xffff, SRAM);
@@ -3881,6 +3977,9 @@ static bool8 ReadUPSPatch(Stream *r, long, int32 &rom_size) {
 	uint32 py_size = XPSdecode(data, addr, size);
 	uint32 out_size = ((uint32)rom_size == px_size) ? py_size : px_size;
 	if (out_size > CMemory::MAX_ROM_SIZE) { return false; } // applying this patch will overflow Memory.ROM buffer
+	if (!Memory.EnsureROMBuffer(out_size)) {
+		return false;
+	}
 
 	// fill expanded area with 0x00s; so that XORing works as expected below.
 	// note that this is needed (and works) whether output ROM is larger or smaller than pre-patched ROM
@@ -3961,6 +4060,9 @@ static bool8 ReadBPSPatch(Stream *r, long, int32 &rom_size) {
 
 	if (target_size > CMemory::MAX_ROM_SIZE) {
 		return false; // applying this patch will overflow Memory.ROM buffer
+	}
+	if (!Memory.EnsureROMBuffer(target_size)) {
+		return false;
 	}
 
 	enum { SourceRead,
@@ -4082,6 +4184,9 @@ static bool8 ReadIPSPatch(Stream *r, long offset, int32 &rom_size) {
 			if (ofs + len > CMemory::MAX_ROM_SIZE) {
 				return (0);
 			}
+			if (!Memory.EnsureROMBuffer(ofs + len)) {
+				return (0);
+			}
 
 			while (len--) {
 				rchar = r->get_char();
@@ -4106,6 +4211,9 @@ static bool8 ReadIPSPatch(Stream *r, long offset, int32 &rom_size) {
 			}
 
 			if (ofs + rlen > CMemory::MAX_ROM_SIZE) {
+				return (0);
+			}
+			if (!Memory.EnsureROMBuffer(ofs + rlen)) {
 				return (0);
 			}
 

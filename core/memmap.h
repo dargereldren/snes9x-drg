@@ -17,7 +17,8 @@
 #include <cstdint>
 
 struct CMemory {
-	enum { MAX_ROM_SIZE = 0x2000000 }; // 32MB: SuperFX 4 carts up to ~27.5MB
+	enum { MAX_ROM_SIZE = 0x10F00000 }; // 271MB: Super FX 4 / GigaFX4
+	enum { DEFAULT_ROM_ALLOC = 0x2000000 }; // 32MB committed until a larger image is loaded
 
 	enum file_formats { FILE_ZIP,
 						FILE_JMA,
@@ -158,6 +159,11 @@ struct CMemory {
 	void Map_SuperFXLoROMMap(void);
 	void Map_SuperFX3LoROMMap(void);
 	void Map_SuperFX4LoROMMap(void);
+	void Map_SuperFX4RomWindows(void);
+	bool8 EnsureROMBuffer(uint32 imageBytes);
+	uint32 ROMAllocSize(void) const;
+	uint8 *ROMScratch(void);
+	void RebindROMPointers(void);
 	void Map_SetaDSPLoROMMap(void);
 	void Map_SDD1LoROMMap(void);
 	void Map_SA1LoROMMap(void);

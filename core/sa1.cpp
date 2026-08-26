@@ -510,7 +510,7 @@ void S9xSetSA1(uint8 byte, uint32 address) {
 
 		if ((Memory.FillRAM[0x2230] & 0xb0) == 0xa0) // CC2
 		{
-			memmove(&Memory.ROM[CMemory::MAX_ROM_SIZE - 0x10000] + SA1.in_char_dma * 16, &Memory.FillRAM[0x2240], 16);
+			memmove(Memory.ROMScratch() + SA1.in_char_dma * 16, &Memory.FillRAM[0x2240], 16);
 			SA1.in_char_dma = (SA1.in_char_dma + 1) & 7;
 			if ((SA1.in_char_dma & 3) == 0) {
 				S9xSA1CharConv2();
@@ -604,7 +604,7 @@ static void S9xSA1CharConv2(void) {
 																						  : 2;
 	int bytes_per_char = 8 * depth;
 	uint8 *p = &Memory.FillRAM[0x3000] + (dest & 0x7ff) + offset * bytes_per_char;
-	uint8 *q = &Memory.ROM[CMemory::MAX_ROM_SIZE - 0x10000] + offset * 64;
+	uint8 *q = Memory.ROMScratch() + offset * 64;
 
 	switch (depth) {
 	case 2:

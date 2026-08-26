@@ -23,9 +23,8 @@ struct FxInfo_s {
 	uint8 *pvRom;		// Pointer to Cart-ROM
 	uint32 speedPerLine;
 	bool8 oneLineDone;
-	bool8 isFx3;			 // Super FX 3 (LRG 2026, ROM type $17/$18)
-	bool8 isFx4;			 // Super FX 4 / GIGA-1 (ROM type $AC/$AF)
-	bool8 hasSeparateGsuRom; // FX4 types $AE/$AF: GSU ROM at ROM+0xB80000
+	bool8 isFx3; // Super FX 3 (LRG 2026, ROM type $17/$18)
+	bool8 isFx4; // Super FX 4 / GIGA-1 (ROM type $AC/$AD)
 };
 
 extern struct FxInfo_s SuperFX;
@@ -37,6 +36,7 @@ void S9xSetSuperFX(uint8, uint16);
 uint8 S9xGetSuperFX(uint16);
 void fx_flushCache(void);
 void fx_computeScreenPointers(void);
+void fx_rebuildFx4RomBanks(void);
 uint32 fx_run(uint32);
 
 #endif
